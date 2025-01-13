@@ -2,78 +2,38 @@
  * Color PRESET and PICKER manipulation
  */
 
-
 (() => {
+	const colorPresetInputs = document.querySelectorAll(
+		"label.color-preset-input input[type='radio']",
+	);
+	const colorPickerInputs = document.querySelectorAll(
+		"label.color-picker-input input[type='color']",
+	);
+	const colorPickerTextInputs = document.querySelectorAll(
+		"label.color-picker-input input[type='text']",
+	);
+	const pickerView = document.querySelectorAll(
+		'.color-picker-wrapper [data-key]',
+	);
 
-	const colorPresetInputs = document.querySelectorAll("label.color-preset-input input[type='radio']");
-	const colorPickerInputs = document.querySelectorAll("label.color-picker-input input[type='color']");
-	const pickerView = document.querySelectorAll('.color-picker-wrapper [data-key]');
-	const moreButton = document.querySelector('.more_button');
-
-	const otherColors = document.querySelector('.other_colors');
-	const otherColorRows = otherColors && otherColors.querySelectorAll('.tutor-option-field-row');
-	const otherColorsExpanded = document.querySelector('.other_colors.expanded');
-	const designNav = document.querySelectorAll('.tutor-option-nav-item');
-
-
-	const otherColorsPreview = () => {
-		let itemsHeight = (initHeight = 0);
-		if (otherColors && otherColorRows) {
-			otherColorRows.forEach((item, index) => {
-				if (0 == index) {
-					initHeight = item.offsetHeight;
-					if (otherColors) {
-						otherColors.style.height = initHeight - 10 + 'px';
-					}
-				}
-				itemsHeight = itemsHeight + item.offsetHeight;
-			});
-		}
-		if (moreButton && otherColors) {
-			const toggleHeight = itemsHeight + moreButton.offsetHeight + 'px';
-			moreButton.onclick = () => {
-				otherColors.classList.toggle('expanded');
-				if (otherColors.classList.contains('expanded')) {
-					otherColors.style.height = toggleHeight;
-					moreButton.querySelector('i').classList.remove('tutor-icon-plus-filled');
-					moreButton.querySelector('i').classList.add('tutor-icon-minus-filled');
-					moreButton.querySelector('span').innerText = 'Show Less';
-				} else {
-					otherColors.style.height = initHeight - 10 + 'px';
-					moreButton.querySelector('i').classList.remove('tutor-icon-minus-filled');
-					moreButton.querySelector('i').classList.add('tutor-icon-plus-filled');
-					moreButton.querySelector('span').innerText = 'Show More';
-				}
-			};
-		}
-	};
-
-
-	if (typeof otherColorsPreview === 'function') {
-		otherColorsPreview();
-	}
-
-	designNav.forEach((item) => {
-		item.onclick = () => {
-			setTimeout(() => {
-				if ('design' === item.children[0].dataset.tab) {
-					otherColorsPreview();
-				}
-			});
-		};
-	});
-
-	// Color PRESET Slecetion (color inputs)
+	// Color PRESET selection (color inputs)
 	if (colorPresetInputs) {
 		colorPresetInputs.forEach((preset) => {
 			const presetItem = preset.parentElement.querySelector('.preset-item');
 			const presetColors = presetItem.querySelectorAll('.header span');
 			const presetInput = preset.closest('.color-preset-input');
+			const presetInputLabels = presetInput.parentElement.querySelectorAll(
+				'label.color-preset-input',
+			);
+
 			// listening preset input events
-			if (true === preset.checked) {
+			if (preset.checked) {
 				presetInput.classList.add('is-checked');
 			}
 			preset.addEventListener('input', (e) => {
+				presetInputLabels.forEach((presetInputLabel) =>
+					presetInputLabel.classList.remove('is-checked'),
+				);
 				presetInput.classList.add('is-checked');
 				presetColors.forEach((color) => {
 					let presetKey = color.dataset.preset;
@@ -82,8 +42,7 @@
 					pickerView.forEach((toPicker) => {
 						let pickerInput = toPicker.dataset.key;
 						if (pickerInput == presetKey) {
-							toPicker.querySelector('input').value = presetColor;
-							toPicker.querySelector('.picker-value').innerHTML = presetColor;
+							toPicker.querySelectorAll('input').forEach((input) => input.value = presetColor);
 
 							toPicker.style.borderColor = presetColor;
 							toPicker.style.boxShadow = `inset 0 0 0 1px ${presetColor}`;
@@ -100,25 +59,31 @@
 	}
 	// Updating Custom Color PRESET
 	const updateCustomPreset = (picker) => {
-		const customPresetEl = document.querySelector("label.color-preset-input[for='custom']");
+		const customPresetEl = document.querySelector(
+			"label.color-preset-input[for='tutor_preset_custom']",
+		);
 
 		// listening picker input events
 		picker.addEventListener('input', function (e) {
-			const presetColors = customPresetEl && customPresetEl.querySelectorAll('.header span');
-			const presetItem = customPresetEl && customPresetEl.querySelector('input[type="radio"]');
+			const presetColors =
+				customPresetEl && customPresetEl.querySelectorAll('.header span');
+			const presetItem =
+				customPresetEl && customPresetEl.querySelector('input[type="radio"]');
 			const pickerCode = picker.nextElementSibling;
-			pickerCode.innerText = picker.value;
+			pickerCode.value = picker.value;
 
-			colorPickerInputs.forEach((picker) => {
-				let preset = picker.dataset.picker;
-				presetColors.forEach((toPreset) => {
-					if (toPreset.dataset.preset == preset) {
-						toPreset.dataset.color = picker.value;
-						toPreset.style.backgroundColor = picker.value;
-					}
+			if (presetColors) {
+				colorPickerInputs.forEach((picker) => {
+					let preset = picker.dataset.picker;
+					presetColors.forEach((toPreset) => {
+						if (toPreset.dataset.preset == preset) {
+							toPreset.dataset.color = picker.value;
+							toPreset.style.backgroundColor = picker.value;
+						}
+					});
+					presetItem.checked = true;
 				});
-				presetItem.checked = true;
-			});
+			}
 		});
 	};
 	// listening color pickers input event
@@ -127,8 +92,14 @@
 			updateCustomPreset(picker);
 		});
 	}
-
-
+	if (colorPickerTextInputs) {
+		colorPickerTextInputs.forEach((picker) => {
+			picker.addEventListener('input', function (e) {
+				if (e.target.value.length === 7) {
+					picker.previousElementSibling.value = e.target.value;
+					picker.previousElementSibling.dispatchEvent(new Event('input', { bubbles: true }));
+				}
+			});
+		});
+	}
 })();
-// if (typeof readyState_complete !== 'undefined' && readyState_complete) {
-// }
