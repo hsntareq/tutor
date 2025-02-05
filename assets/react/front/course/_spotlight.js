@@ -1,5 +1,5 @@
 import ajaxHandler from '../../admin-dashboard/segments/filter';
-jQuery(document).ready(function($) {
+jQuery(document).ready(function ($) {
 	$('.tutor-sortable-list').sortable();
 });
 
@@ -19,7 +19,17 @@ document.addEventListener('DOMContentLoaded', (event) => {
 		});
 	}
 
-	const sidebarTabeHandler = function(sideBarTabs) {
+	/**
+	 * dynamically calcutate sidebarContent height from top
+	 * and decrease sidebar height
+	 */
+	const sidebarTabContent = document.querySelector('.tutor-sidebar-tabs-content');
+	if (sidebarTabContent) {
+		let sidebarTabContentBoundingTop = sidebarTabContent.getBoundingClientRect().top;
+		sidebarTabContent.style.height = `calc(100vh - ${sidebarTabContentBoundingTop}px)`;
+	}
+
+	const sidebarTabeHandler = function (sideBarTabs) {
 		const tabWrapper = document.querySelector('.tutor-desktop-sidebar-area');
 
 		if (null !== tabWrapper && tabWrapper.children.length < 2) {
@@ -32,10 +42,21 @@ document.addEventListener('DOMContentLoaded', (event) => {
 				clearActiveClass(tabConent);
 				event.currentTarget.classList.add('active');
 				let id = event.currentTarget.getAttribute('data-sidebar-tab');
-				tabConent.querySelector('#' + id).classList.add('active');
+				const activeQnaTabContent = tabConent.querySelector('#' + id);
+				activeQnaTabContent.classList.add('active');
+
+				/**
+				 * dynamically calcutate qnatabcontentrarea height from top
+				 * and decrease it's height from 100vh
+				 */
+				const sidebarTabArea = document.querySelector('.tutor-lessons-tab-area');
+				let sidebarTabAreaHeight = sidebarTabArea.offsetHeight;
+				if (id == 'sidebar-qna-tab-content') {
+					activeQnaTabContent.style.height = `calc(100% - ${sidebarTabAreaHeight}px)`;
+				}
 			});
 		});
-		const clearActiveClass = function(tabConent) {
+		const clearActiveClass = function (tabConent) {
 			for (let i = 0; i < sideBarTabs.length; i++) {
 				sideBarTabs[i].classList.remove('active');
 			}
@@ -88,51 +109,19 @@ document.addEventListener('DOMContentLoaded', (event) => {
 	}
 	commentSideLine();
 	window.addEventListener(_tutorobject.content_change_event, commentSideLine);
-
-	const spotlightTabs = document.querySelectorAll('.tutor-spotlight-tab.tutor-default-tab .tab-header-item');
-	const spotlightTabContent = document.querySelectorAll('.tutor-spotlight-tab .tab-body-item');
-	if (spotlightTabs && spotlightTabContent) {
-		document.addEventListener('click', (event) => {
-			const currentItem = event.target;
-			const isValidCurrentItem = currentItem.classList.contains('tab-header-item');
-			if (isValidCurrentItem) {
-				clearSpotlightTabActiveClass(spotlightTabs, spotlightTabContent);
-				currentItem.classList.add('is-active');
-				let id = currentItem.getAttribute('data-tutor-spotlight-tab-target');
-				let query_string = currentItem.getAttribute('data-tutor-query-string');
-
-				const tabConent = currentItem.parentNode.nextElementSibling;
-				if (null !== tabConent.querySelector('#' + id)) {
-					tabConent.querySelector('#' + id).classList.add('is-active');
-				}
-				if (id === 'tutor-course-spotlight-tab-3') {
-					commentSideLine();
-				}
-				let url = new URL(window.location);
-				url.searchParams.set('page_tab', query_string);
-				window.history.pushState({}, '', url);
-			}
-		});
-		const clearSpotlightTabActiveClass = () => {
-			const spotlightTabs = document.querySelectorAll('.tutor-spotlight-tab.tutor-default-tab .tab-header-item');
-			const spotlightTabContent = document.querySelectorAll('.tutor-spotlight-tab .tab-body-item');
-
-			spotlightTabs.forEach((item) => {
-				item.classList.remove('is-active');
-			});
-			spotlightTabContent.forEach((item) => {
-				item.classList.remove('is-active');
-			});
-		};
-	}
 	/* commenting */
 
-	// quize drag n drop functionality
+	// quiz drag n drop functionality
 	const tutorDraggables = document.querySelectorAll('.tutor-draggable > div');
 	const tutorDropzone = document.querySelectorAll('.tutor-dropzone');
 	tutorDraggables.forEach((quizBox) => {
 		quizBox.addEventListener('dragstart', dragStart);
 		quizBox.addEventListener('dragend', dragEnd);
+	});
+	tutorDraggables.forEach((quizBox) => {
+		['touchstart', 'touchmove', 'touchend'].forEach(function (e) {
+			quizBox.addEventListener(e, touchHandler);
+		});
 	});
 	tutorDropzone.forEach((quizImageBox) => {
 		quizImageBox.addEventListener('dragover', dragOver);
@@ -140,6 +129,107 @@ document.addEventListener('DOMContentLoaded', (event) => {
 		quizImageBox.addEventListener('dragleave', dragLeave);
 		quizImageBox.addEventListener('drop', dragDrop);
 	});
+
+	let scrollInterval = null;
+	let scrollDirection = 0;
+
+	function touchHandler(e) {
+		e.preventDefault();
+		const { type } = e;
+
+		if (type === 'touchstart') {
+			this.classList.add('tutor-dragging');
+			startScroll();
+		} else if (type === 'touchmove') {
+			const element = e.target.closest('.tutor-dragging');
+			let copiedDragElement = document.querySelector('.tutor-drag-copy');
+			if (element) {
+				const mainElementBoundingRect = element.getBoundingClientRect();
+				const clientY = e.touches[0].clientY;
+				const clientX = e.touches[0].clientX;
+
+				const scrollThreshold = 100;
+				const maxScrollSpeed = 40;
+
+				const viewportHeight = window.innerHeight;
+				const distanceFromBottom = viewportHeight - clientY;
+				const distanceFromTop = clientY;
+
+				scrollDirection = 0;
+
+				if (distanceFromBottom < scrollThreshold) {
+					scrollDirection = calculateScrollSpeed(scrollThreshold, distanceFromBottom, maxScrollSpeed);
+				} else if (distanceFromTop < scrollThreshold) {
+					scrollDirection = - calculateScrollSpeed(scrollThreshold, distanceFromTop, maxScrollSpeed)
+				}
+
+				if (!copiedDragElement) {
+					copiedDragElement = element.cloneNode(true);
+					copiedDragElement.classList.add('tutor-drag-copy');
+					element.parentNode.appendChild(copiedDragElement);
+				}
+				copiedDragElement.style.position = 'fixed';
+				copiedDragElement.style.left = clientX - copiedDragElement.clientWidth / 2 + 'px';
+				copiedDragElement.style.top = clientY - copiedDragElement.clientHeight / 2 + 'px';
+				copiedDragElement.style.zIndex = '9999';
+				copiedDragElement.style.opacity = '0.5';
+				copiedDragElement.style.width = mainElementBoundingRect.width + 'px';
+				copiedDragElement.style.height = mainElementBoundingRect.height + 'px';
+			}
+		} else if (type === 'touchend') {
+			const copiedDragElement = document.querySelector('.tutor-drag-copy');
+			if (copiedDragElement) {
+				copiedDragElement.remove();
+				const evt = typeof e.originalEvent === 'undefined' ? e : e.originalEvent;
+				const touch = evt.touches[0] || evt.changedTouches[0];
+				let [x, y] = [touch.clientX, touch.clientY];
+				let dropZone = document.elementFromPoint(x, y);
+				if (dropZone.classList.contains('tutor-dropzone') || dropZone.closest('.tutor-dropzone')) {
+					if (!dropZone.classList.contains('tutor-dropzone')) {
+						dropZone = dropZone.closest('.tutor-dropzone');
+					}
+					const input = copiedDragElement.querySelector('input');
+					const inputName = input.dataset.name;
+					const newInput = document.createElement('input');
+					newInput.type = 'text';
+					newInput.setAttribute('value', input.value);
+					newInput.setAttribute('name', inputName);
+
+					/**
+					 * Selecting a correct option after an incorrect fails in mobile issue fixed.
+					 * 
+					 * @since 3.2.0
+					 */
+					const dropZoneInput = dropZone.querySelector('input');
+					if (dropZoneInput) {
+						dropZoneInput.remove();
+					}
+
+					dropZone.appendChild(newInput);
+					const copyContent = copiedDragElement.querySelector('.tutor-dragging-text-conent').textContent;
+					dropZone.querySelector('.tutor-dragging-text-conent').textContent = copyContent;
+					dropZone.querySelector('.tutor-dragging-text-conent').classList.add('tutor-color-black');
+					this.classList.remove('tutor-dragging');
+				}
+			}
+			stopScroll();
+		}
+	}
+	function stopScroll() {
+		clearInterval(scrollInterval);
+		scrollInterval = null;
+	}
+	function startScroll() {
+		if (!scrollInterval) {
+			scrollInterval = setInterval(() => {
+				window.scrollBy(0, scrollDirection);
+			}, 60);
+		}
+	}
+	function calculateScrollSpeed(threshold, distance, maxSpeed) {
+		const speed = (threshold - distance) / threshold * maxSpeed;
+		return Math.max(speed, 0);
+	}
 	function dragStart() {
 		this.classList.add('tutor-dragging');
 	}
@@ -150,7 +240,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 		this.classList.add('tutor-drop-over');
 		event.preventDefault();
 	}
-	function dragEnter() {}
+	function dragEnter() { }
 	function dragLeave() {
 		this.classList.remove('tutor-drop-over');
 	}
@@ -160,7 +250,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
 			this.querySelector('input').remove();
 		}
 		const input = copyElement.querySelector('input');
-		const inputValue = input.value;
 		const inputName = input.dataset.name;
 		const newInput = document.createElement('input');
 		newInput.type = 'text';
@@ -169,6 +258,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 		this.appendChild(newInput);
 		const copyContent = copyElement.querySelector('.tutor-dragging-text-conent').textContent;
 		this.querySelector('.tutor-dragging-text-conent').textContent = copyContent;
+		this.querySelector('.tutor-dragging-text-conent').classList.add('tutor-color-black');
 		this.classList.remove('tutor-drop-over');
 	}
 
@@ -179,23 +269,28 @@ document.addEventListener('DOMContentLoaded', (event) => {
 		fileUploadField.addEventListener('change', tutorAssignmentFileHandler);
 	}
 	function tutorAssignmentFileHandler() {
+
 		const uploadedFileSize = [...fileUploadField.files].reduce((sum, file) => sum + file.size, 0); // byte
-		const uploadSizeLimit = parseInt(document.querySelector('input[name="tutor_assignment_upload_limit"]')?.value) || 0;
+		const uploadSizeLimit =
+			parseInt(document.querySelector('input[name="tutor_assignment_upload_limit"]')?.value) || 0;
 		let message = '';
 		const maxAllowedFiles = window._tutorobject.assignment_max_file_allowed;
 		let alreadyUploaded = document.querySelectorAll(
-			'#tutor-student-assignment-edit-file-preview .tutor-instructor-card',
+			'#tutor-student-assignment-edit-file-preview .tutor-instructor-card'
 		).length;
 		const allowedToUpload = maxAllowedFiles - alreadyUploaded;
 		if (fileUploadField.files.length > allowedToUpload) {
+			fileUploadField.value = null;
 			tutor_toast(__('Warning', 'tutor'), __(`Max ${maxAllowedFiles} file allowed to upload`, 'tutor'), 'error');
 			return;
+
 		}
 		if (uploadedFileSize > uploadSizeLimit) {
+			fileUploadField.value = null;
 			tutor_toast(
 				__('Warning', 'tutor'),
 				__(`File size exceeds maximum limit ${Math.floor(uploadSizeLimit / 1000000)} MB.`, 'tutor'),
-				'error',
+				'error'
 			);
 			return;
 		}
@@ -205,7 +300,11 @@ document.addEventListener('DOMContentLoaded', (event) => {
 				message = 'Select one or more files.';
 			} else {
 				if (fileUploadField.files.length > allowedToUpload) {
-					tutor_toast(__('Warning', 'tutor'), __(`Max ${maxAllowedFiles} file allowed to upload`, 'tutor'), 'error');
+					tutor_toast(
+						__('Warning', 'tutor'),
+						__(`Max ${maxAllowedFiles} file allowed to upload`, 'tutor'),
+						'error'
+					);
 				}
 				let fileCard = '';
 				const assignmentFilePreview = document.querySelector('.tutor-asisgnment-upload-file-preview');
@@ -219,15 +318,15 @@ document.addEventListener('DOMContentLoaded', (event) => {
 					let editWrapClass = assignmentEditFilePreview ? 'tutor-col-sm-5 tutor-py-16 tutor-mr-16' : '';
 					fileCard += `<div class="tutor-instructor-card ${editWrapClass}">
                                     <div class="tutor-icard-content">
-                                        <div class="tutor-fs-6 tutor-color-black-70">
+                                        <div class="tutor-fs-6 tutor-color-secondary">
                                             ${file.name}
                                         </div>
                                         <div class="tutor-fs-7">Size: ${file.size}</div>
                                     </div>
                                     <div onclick="(() => {
 										this.closest('.tutor-instructor-card').remove();
-									})()" class="tutor-attachment-file-close tutor-avatar tutor-is-xs flex-center">
-                                        <span class="tutor-icon-cross-filled color-design-brand"></span>
+									})()" class="tutor-attachment-file-close tutor-iconic-btn tutor-iconic-btn-outline flex-center">
+                                        <span class="tutor-icon-times"></span>
                                     </div>
                                 </div>`;
 				}
@@ -241,33 +340,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
 		}
 	}
 
-	/* Show More Text */
-	const showMoreBtn = document.querySelector('.tutor-show-more-btn button');
-	if (showMoreBtn) {
-		showMoreBtn.addEventListener('click', showMore);
-	}
-
-	function showMore() {
-		let lessText = document.getElementById('short-text');
-		let dots = document.getElementById('dots');
-		let moreText = document.getElementById('full-text');
-		let btnText = document.getElementById('showBtn');
-		let contSect = document.getElementById('content-section');
-		if (dots.style.display === 'none') {
-			lessText.style.display = 'block';
-			dots.style.display = 'inline';
-			btnText.innerHTML =
-				"<span class='btn-icon tutor-icon-plus-filled color-design-brand'></span><span class='tutor-color-black'>" + __('Show More', 'tutor') + "</span>";
-			moreText.style.display = 'none';
-		} else {
-			lessText.style.display = 'none';
-			dots.style.display = 'none';
-			btnText.innerHTML =
-				"<span class='btn-icon tutor-icon-minus-filled color-design-brand'></span><span class='tutor-color-black'>" + __('Show Less', 'tutor') + "</span>";
-			moreText.style.display = 'block';
-			contSect.classList.add('no-before');
-		}
-	}
 	//remove file
 	const removeButton = document.querySelectorAll('.tutor-attachment-file-close a');
 	removeButton.forEach((item) => {
@@ -282,7 +354,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 			formData.set('file_name', fileName);
 			formData.set(window.tutor_get_nonce_data(true).key, window.tutor_get_nonce_data(true).value);
 			const span = currentTarget.querySelector('span');
-			span.classList.add('tutor-updating-message');
+			event.target.classList.add('is-loading');
 			const post = await ajaxHandler(formData);
 			if (post.ok) {
 				const response = await post.json();
@@ -293,7 +365,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 				}
 			} else {
 				alert(post.statusText);
-				span.classList.remove('tutor-updating-message');
+				event.target.classList.remove('is-loading');
 			}
 		};
 	});

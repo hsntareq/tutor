@@ -12,8 +12,9 @@ const modalConfirmation = document.getElementById('tutor-modal-bulk-action');
 const modalResetOpen = () => {
 	const modalResetOpen = document.querySelectorAll('.modal-reset-open');
 	let resetButton = modalConfirmation && modalConfirmation.querySelector('.reset_to_default');
-	let modalHeading = modalConfirmation && modalConfirmation.querySelector('.tutor-modal-title');
-	let modalMessage = modalConfirmation && modalConfirmation.querySelector('.tutor-modal-message');
+	let modalHeading = modalConfirmation && modalConfirmation.querySelector('[data-modal-dynamic-title]');
+	let modalMessage = modalConfirmation && modalConfirmation.querySelector('[data-modal-dynamic-content]');
+
 	modalResetOpen.forEach((modalOpen, index) => {
 		modalOpen.disabled = false;
 		modalOpen.onclick = (e) => {
@@ -22,18 +23,11 @@ const modalResetOpen = () => {
 			resetButton.dataset.resetFor = modalOpen.previousElementSibling.innerText;
 			modalMessage.innerText = modalOpen.dataset.message;
 		}
-	})
+	});
 }
 
-/* const titleReseter = document.querySelectorAll('.tutor-option-single-item');
-titleReseter.forEach((item) => {
-	let h4 = item.querySelector('h4');
-	!h4 ? 0 : h4.onclick = (e) => {
-		item.parentElement.querySelector('.modal-reset-open').click()
-	}
-}) */
-
 const resetConfirmation = () => {
+	const { __, sprintf } = wp.i18n;
 	const resetDefaultBtn = document.querySelectorAll('.reset_to_default');
 	resetDefaultBtn.forEach((resetBtn, index) => {
 		resetBtn.onclick = (event) => {
@@ -188,11 +182,13 @@ const resetConfirmation = () => {
 							}
 						});
 						setTimeout(() => {
-							tutor_toast('Reset Successful', 'All modified settings of ' + resetTitle + ' have been changed to default.', 'success');
+							tutor_toast(__('Reset Successful', 'tutor'), sprintf(__('All modified settings of %s have been changed to default.', 'tutor'), resetTitle), 'success');
 							if(document.getElementById('save_tutor_option')){
 								document.getElementById('save_tutor_option').disabled = false;
 							}
 						}, 300)
+
+						document.body.classList.remove('tutor-modal-open');
 					}
 
 				};

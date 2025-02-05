@@ -1,4 +1,6 @@
-import '../../../v2-library/_src/js/main';
+import '../../../v2-library/src/js/main';
+import ajaxHandler from '../admin-dashboard/segments/filter';
+import tutorFormData from "../helper/tutor-formdata";
 
 window.tutor_get_nonce_data = function(send_key_value) {
 	var nonce_data = window._tutorobject || {};
@@ -12,42 +14,47 @@ window.tutor_get_nonce_data = function(send_key_value) {
 	return { [nonce_key]: nonce_value };
 };
 
-window.tutor_popup = function($, icon, padding) {
+window.tutor_popup = function($, icon) {
+	const { __ } = wp.i18n;
 	var $this = this;
 	var element;
 
 	this.popup_wrapper = function(wrapper_tag) {
-		var img_tag =
-			icon === ''
-				? ''
-				: '<img class="tutor-pop-icon" src="' + window._tutorobject.tutor_url + 'assets/images/' + icon + '.svg"/>';
+		var html = '<'+ wrapper_tag +' id="tutor-legacy-modal" class="tutor-modal tutor-is-active">';
+			html += '<div class="tutor-modal-overlay"></div>';
+			html += '<div class="tutor-modal-window">';
+				html += '<div class="tutor-modal-content tutor-modal-content-white">';
+					html += '<button class="tutor-iconic-btn tutor-modal-close-o" data-tutor-modal-close><span class="tutor-icon-times" area-hidden="true"></span></button>';
+					html += '<div class="tutor-modal-body tutor-text-center">';
+						html += '<div class="tutor-px-lg-48 tutor-py-lg-24">';
+						
+							if (icon) {
+								html += '<div class="tutor-mt-24"><img class="tutor-d-inline-block" src="' + window._tutorobject.tutor_url + 'assets/images/' + icon + '.svg" /></div>';
+							}
 
-		return (
-			'<' +
-			wrapper_tag +
-			' class="tutor-component-popup-container">\
-            <div class="tutor-component-popup-' +
-			padding +
-			'">\
-                <div class="tutor-component-content-container">' +
-			img_tag +
-			'</div>\
-                <div class="tutor-component-button-container"></div>\
-            </div>\
-        </' +
-			wrapper_tag +
-			'>'
-		);
+							html += '<div class="tutor-modal-content-container"></div>';
+
+							// Buttons
+							html += '<div class="tutor-d-flex tutor-justify-center tutor-mt-48 tutor-mb-24 tutor-modal-actions"></div>';
+						
+						html += '</div>';
+					html += '</div>';
+				html += '</div>';
+			html += '</div>';
+		html += '</'+ wrapper_tag +'>';
+
+		return html;
 	};
 
 	this.popup = function(data) {
-		var title = data.title ? '<h3>' + data.title + '</h3>' : '';
-		var description = data.description ? '<p>' + data.description + '</p>' : '';
+		var title = data.title ? '<div class="tutor-fs-3 tutor-fw-medium tutor-color-black tutor-mb-12">'+ data.title +'</div>' : '';
+		var description = data.description ? '<div class="tutor-fs-6 tutor-color-muted">'+ data.description +'</div>' : '';
 
 		var buttons = Object.keys(data.buttons || {}).map(function(key) {
 			var button = data.buttons[key];
 			var button_id = button.id ? 'tutor-popup-' + button.id : '';
-			return $('<button id="' + button_id + '" class="' + button.class + '">' + button.title + '</button>').click(
+			var button_attr = button.attr ? ' ' + button.attr : '';
+			return $('<button id="' + button_id + '" class="' + button.class + '"' + button_attr + '>' + button.title + '</button>').click(
 				function() {
 					button.callback($(this));
 				}
@@ -55,45 +62,22 @@ window.tutor_popup = function($, icon, padding) {
 		});
 
 		element = $($this.popup_wrapper(data.wrapper_tag || 'div'));
-		var content_wrapper = element.find('.tutor-component-content-container');
+		var content_wrapper = element.find('.tutor-modal-content-container');
 
 		content_wrapper.append(title);
-		data.after_title ? content_wrapper.append(data.after_title) : 0;
-
 		content_wrapper.append(description);
-		data.after_description ? content_wrapper.append(data.after_description) : 0;
-
-		// Assign close event on click black overlay
-		element
-			.click(function() {
-				$(this).remove();
-			})
-			.children()
-			.click(function(e) {
-				e.stopPropagation();
-			});
-
-		// Append action button
-		for (var i = 0; i < buttons.length; i++) {
-			element.find('.tutor-component-button-container').append(buttons[i]);
-		}
 
 		$('body').append(element);
+		$('body').addClass('tutor-modal-open');
+
+		for (var i = 0; i < buttons.length; i++) {
+			element.find('.tutor-modal-actions').append(buttons[i]);
+		}
 
 		return element;
 	};
 
 	return { popup: this.popup };
-};
-
-window.tutorDotLoader = (loaderType) => {
-	return `
-    <div class="tutor-dot-loader ${loaderType ? loaderType : ''}">
-        <span class="dot dot-1"></span>
-        <span class="dot dot-2"></span>
-        <span class="dot dot-3"></span>
-        <span class="dot dot-4"></span>
-    </div>`;
 };
 
 window.tutor_date_picker = () => {
@@ -215,7 +199,7 @@ jQuery(document).ready(function($) {
 			type: 'POST',
 			data: { lesson_id: lesson_id, action: 'tutor_delete_lesson_by_id' },
 			beforeSend: function() {
-				$that.addClass('tutor-updating-message');
+				$that.addClass('is-loading');
 			},
 			success: function(data) {
 				if (data.success) {
@@ -223,7 +207,7 @@ jQuery(document).ready(function($) {
 				}
 			},
 			complete: function() {
-				$that.removeClass('tutor-updating-message');
+				$that.removeClass('is-loading');
 			},
 		});
 	});
@@ -251,7 +235,7 @@ jQuery(document).ready(function($) {
 				action: 'tutor_delete_quiz_by_id',
 			},
 			beforeSend: function() {
-				$that.addClass('tutor-updating-message');
+				$that.addClass('is-loading');
 			},
 			success: function(resp) {
 				const { data = {}, success } = resp || {};
@@ -262,14 +246,15 @@ jQuery(document).ready(function($) {
 					return;
 				}
 
-				tutor_toast('Error!', message, 'error');
+				tutor_toast(__('Error!', 'tutor'), message, 'error');
 			},
 			complete: function() {
-				$that.removeClass('tutor-updating-message');
+				$that.removeClass('is-loading');
 			},
 		});
 	});
 
+	// @todo: find out the usage
 	$(document).on('click', '.settings-tabs-navs li', function(e) {
 		e.preventDefault();
 
@@ -315,6 +300,7 @@ jQuery(document).ready(function($) {
 	$(document).on('click', '.tutor-instructor-feedback', function(e) {
 		e.preventDefault();
 		var $that = $(this);
+		let btnContent = $that.html();
 		console.log(tinymce.activeEditor.getContent());
 		$.ajax({
 			url: window.ajaxurl || _tutorobject.ajaxurl,
@@ -325,7 +311,7 @@ jQuery(document).ready(function($) {
 				action: 'tutor_instructor_feedback',
 			},
 			beforeSend: function() {
-				$that.addClass('tutor-updating-message');
+				$that.text(__('Updating...', 'tutor')).attr('disabled', 'disabled').addClass('is-loading');
 			},
 			success: function(data) {
 				if (data.success) {
@@ -334,22 +320,9 @@ jQuery(document).ready(function($) {
 				}
 			},
 			complete: function() {
-				$that.removeClass('tutor-updating-message');
+				$that.html(btnContent).removeAttr('disabled').removeClass('is-loading');
 			},
 		});
-	});
-
-	//dropdown toggle
-	$(document).click(function() {
-		$('.tutor-dropdown').removeClass('show');
-	});
-
-	$('.tutor-dropdown').click(function(e) {
-		e.stopPropagation();
-		if ($('.tutor-dropdown').hasClass('show')) {
-			$('.tutor-dropdown').removeClass('show');
-		}
-		$(this).addClass('tutor-dropdown-show');
 	});
 
 	/**
@@ -364,17 +337,25 @@ jQuery(document).ready(function($) {
 		var type = $(this).attr('method') || 'GET';
 		var data = $(this).serializeObject();
 
-		$that.find('button').addClass('tutor-updating-message');
-
 		$.ajax({
 			url: url,
 			type: type,
 			data: data,
-			success: function() {
-				tutor_toast(__('Success', 'tutor'), $that.data('toast_success_message'), 'success');
+			beforeSend: function() {
+				$that.find('button').attr('disabled', 'disabled').addClass('is-loading');
+			},
+			success: function(response) {
+				if (response.success) {
+					tutor_toast(__('Success', 'tutor'), $that.data('toast_success_message'), 'success');
+				} else {
+					tutor_toast(__('Error!', 'tutor'), response.data, 'error');
+				}
+			},
+			error: function(response) {
+				tutor_toast(__('Error!', 'tutor'), response.statusText, 'error');
 			},
 			complete: function() {
-				$that.find('button').removeClass('tutor-updating-message');
+				$that.find('button').removeAttr('disabled').removeClass('is-loading');
 			},
 		});
 	});
@@ -404,69 +385,136 @@ jQuery.fn.serializeObject = function() {
 	return values;
 };
 
-window.tutor_toast = function(title, description, type) {
-	var tutor_ob = window._tutorobject || {};
-	var asset = (tutor_ob.tutor_url || '') + 'assets/images/';
-
-	if (!jQuery('.tutor-toast-parent').length) {
+/**
+ * Show toast message
+ * 
+ * @param {string} title 
+ * @param {string} description 
+ * @param {'success' | 'warning' | 'error'} type
+ * @return {void}
+ * 
+ * @since 1.0.0
+ */
+window.tutor_toast = function( title, description, type, autoClose = true ) {	
+	if ( ! jQuery('.tutor-toast-parent').length ) {
 		jQuery('body').append('<div class="tutor-toast-parent tutor-toast-right"></div>');
-		// jQuery('body').append('<div class="tutor-notification tutor-is-danger tutor-mb-16"></div>');
 	}
 
-	// var icons = {
-	//     success: asset + 'icon-check.svg',
-	//     error: asset + 'icon-cross.svg'
-	// }
-	var alert = type == 'success' ? 'success' : type == 'error' ? 'danger' : 'primary';
-	var icon =
-		type == 'success'
-			? 'tutor-icon-mark-filled'
-			: type == 'error'
-			? 'tutor-icon-line-cross-line'
-			: 'tutor-icon-info-circle-outline-filled';
-	var contentS = jQuery(`
-        <div class="tutor-large-notification tutor-large-notification-${alert}">
-            <div class="tutor-large-notification-icon">
-                <span class="tutor-icon-48 ${icon} tutor-mr-12"></span>
-            </div>
-            <div class="tutor-large-notification-content tutor-ml-5">
-                <div class="tutor-large-notification-title tutor-fs-6 tutor-fw-bold tutor-mt-12">
-                    ${title}
-                </div>
-                <div class="tutor-fs-7 tutor-mt-8">
-                    ${description}
-                </div>
-            </div>
-            <span class="tutor-toast-close tutor-noti-close tutor-icon-32 color-black-40 tutor-icon-cross-filled"></span>
-        </div>
-    `);
+	let alert = type == 'success' ? 'success' 
+				: type == 'error' ? 'danger'
+				: type == 'warning' ? 'warning' : 'primary';
+	
+	let icon = 	type == 'success' ? 'tutor-icon-circle-mark-line'
+				: type == 'error' ? 'tutor-icon-circle-times-line' : 'tutor-icon-circle-info-o';
+	
+	let hasDescription = ( description !== undefined && description !== null && String(description).trim() !== '' )
 
-	var content = jQuery(`
+	let content = jQuery(`
 		<div class="tutor-notification tutor-is-${alert} tutor-mb-16">
 			<div class="tutor-notification-icon">
 				<i class="${icon}"></i>
 			</div>
 			<div class="tutor-notification-content">
 			<h5>${title}</h5>
-			<p>${description}</p>
+			<p class="${ ! hasDescription ? 'tutor-d-none' : '' }">${description}</p>
 			</div>
 			<button class="tutor-notification-close">
-				<i class="fas fa-times"></i>
+				<i class="tutor-icon-times"></i>
 			</button>
 		</div>
     `);
 
-	content.find('.tutor-noti-close').click(function() {
+	content.find('.tutor-notification-close').click(function() {
 		content.remove();
 	});
 
 	jQuery('.tutor-toast-parent').append(content);
 
-	setTimeout(function() {
-		if (content) {
-			content.fadeOut('fast', function() {
-				jQuery(this).remove();
-			});
-		}
-	}, 5000);
+	if(autoClose) {
+		setTimeout(function() {
+			if (content) {
+				content.fadeOut('fast', function() {
+					jQuery(this).remove();
+				});
+			}
+		}, 5000);
+	}
 };
+
+/**
+ * Escape HTML and return safe HTML
+ * 
+ * @since 2.2.4
+ * 
+ * @param {string} unsafeText HTML string
+ * @returns string
+ */
+export function tutor_esc_html(unsafeText) {
+	let safeHTML = ''
+	let div = document.createElement('div');
+	/**
+	 * When set an HTML string to an element's innerText
+	 * the browser automatically escapes any HTML tags and
+	 * treats the content as plain text.
+	 */
+	div.innerText = unsafeText;
+	safeHTML = div.innerHTML;
+	div.remove()
+
+	return safeHTML;
+}
+window.tutor_esc_html = tutor_esc_html;
+
+export function tutor_esc_attr(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+}
+
+window.tutor_esc_attr = tutor_esc_attr;
+
+// enable custom selector when modal opens
+window.addEventListener('tutor_modal_shown', (e) => {
+	selectSearchField('.tutor-form-select');
+})
+
+/**
+ * Create new draft course
+ * @since 3.0.0
+ */
+const createNewCourseButtons = document.querySelectorAll('a.tutor-create-new-course,li.tutor-create-new-course a');
+createNewCourseButtons.forEach((button) => {
+	button.addEventListener('click', async (e) => {
+		e.preventDefault();
+		const { __ } = wp.i18n;
+		const defaultErrorMessage = __('Something went wrong, please try again', 'tutor');
+		
+		try {
+			// For wp-admin bar quick create.
+			if (e.target.classList.contains('ab-item')) {
+				e.target.innerHTML = 'Creating...'
+			}
+
+			button.classList.add('is-loading');
+			button.style.pointerEvents = 'none';
+
+			const from_dashboard = button.classList.contains('tutor-dashboard-create-course')
+			const formData = tutorFormData([{ action: 'tutor_create_new_draft_course', from_dashboard: from_dashboard }]);
+			const post = await ajaxHandler(formData);
+
+			const { status_code, data, message } = await post.json();
+			if (status_code === 201) {
+				window.location = data;
+			} else {
+				tutor_toast(__('Failed', 'tutor'), message, 'error');
+			}
+		} catch (error) {
+			tutor_toast(__('Failed', 'tutor'), defaultErrorMessage, 'error');
+		} finally {
+			button.removeAttribute('disabled');
+			button.classList.remove('is-loading');
+		}
+	});
+});

@@ -1,10 +1,3 @@
-if (typeof readyState_complete !== 'undefined' && readyState_complete) {
-	readyState_complete(() => {
-		// typeof resetConfirmation === 'function' ? resetConfirmation() : '';
-		// typeof modalResetOpen === 'function' ? modalResetOpen() : '';
-	});
-}
-
 document.addEventListener('readystatechange', (event) => {
 	if (event.target.readyState === 'interactive') {
 		export_settings_all();
@@ -71,6 +64,13 @@ const load_saved_data = () => {
 	};
 };
 
+function capitalizeFirstLetter(string) {
+	if (!string) {
+		return '';
+	}
+	return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
 function tutor_option_history_load(dataset) {
 	var output = '';
 	if (null !== dataset && 0 !== dataset.length) {
@@ -78,47 +78,42 @@ function tutor_option_history_load(dataset) {
 			let dataKey = value[0];
 			let dataValue = value[1];
 
-			let badgeStatus = dataValue.datatype == 'saved' ? ' label-primary-wp' : ' label-refund';
+			let badgeStatus = dataValue.datatype == 'saved' ? ' label-primary' : ' label-refund';
 			output += `<div class="tutor-option-field-row">
-					<div class="tutor-option-field-label">
-						<p class="tutor-fs-7 tutor-fw-medium">${dataValue.history_date}
-						<span class="tutor-badge-label tutor-ml-16${badgeStatus}"> ${dataValue.datatype}</span> </p>
+				<div class="tutor-option-field-label">
+					<div class="tutor-fs-7 tutor-fw-medium">${dataValue.history_date}
+					<span class="tutor-badge-label tutor-ml-16${badgeStatus}"> ${capitalizeFirstLetter(dataValue.datatype)}</span> </div>
+				</div>
+				<div class="tutor-option-field-input">
+					<button class="tutor-btn tutor-btn-outline-primary tutor-btn-sm apply_settings" data-tutor-modal-target="tutor-modal-bulk-action" data-btntext="Yes, Restore Settings" data-heading="Restore Previous Settings?" data-message="WARNING! This will overwrite all existing settings, please proceed with caution." data-id="${dataKey}">Apply</button>
+					<div class="tutor-dropdown-parent tutor-ml-16">
+						<button type="button" class="tutor-iconic-btn" action-tutor-dropdown="toggle">
+							<span class="tutor-icon-kebab-menu" area-hidden="true"></span>
+						</button>
+						<ul class="tutor-dropdown tutor-dropdown-dark tutor-text-left">
+							<li>
+								<a href="javascript:;" class="tutor-dropdown-item export_single_settings" data-id="${dataKey}">
+									<span class="tutor-icon-archive tutor-mr-8" area-hidden="true"></span>
+									<span>Download</span>
+								</a>
+							</li>
+							<li>
+								<a href="javascript:;" class="tutor-dropdown-item delete_single_settings" data-tutor-modal-target="tutor-modal-bulk-action" data-btntext="Yes, Delete Settings" data-heading="Delete This Settings?" data-message="WARNING! This will remove the settings history data from your system, please proceed with caution." data-id="${dataKey}">
+									<span class="tutor-icon-trash-can-bold tutor-mr-8" area-hidden="true"></span>
+									<span>Delete</span>
+								</a>
+							</li>
+						</ul>
 					</div>
-					<div class="tutor-option-field-input">
-						<button class="tutor-btn tutor-is-outline tutor-is-default tutor-is-xs apply_settings"  data-tutor-modal-target="tutor-modal-bulk-action" data-btntext="Yes, Restore Settings" data-heading="Restore Previous Settings?" data-message="WARNING! This will overwrite all existing settings, please proceed with caution."  data-id="${dataKey}">Apply</button>
-
-          <div class="tutor-popup-opener tutor-ml-16">
-            <button
-            type="button"
-            class="popup-btn"
-            data-tutor-popup-target="popup-${dataKey}"
-            >
-            <span class="toggle-icon"></span>
-            </button>
-            <ul id="popup-${dataKey}" class="popup-menu">
-            <li>
-              <a class="export_single_settings" data-id="${dataKey}">
-                <span class="icon tutor-icon-msg-archive-filled tutor-color-design-white"></span>
-                <span class="tutor-fs-6 tutor-color-white">Download</span>
-              </a>
-            </li>
-            <li>
-              <a class="delete_single_settings"  data-tutor-modal-target="tutor-modal-bulk-action" data-btntext="Yes, Delete Settings" data-heading="Delete This Settings?" data-message="WARNING! This will remove the settings history data from your system, please proceed with caution." data-id="${dataKey}">
-                <span class="icon tutor-icon-delete-fill-filled tutor-color-design-white"></span>
-                <span class="tutor-fs-6 tutor-color-white">Delete</span>
-              </a>
-            </li>
-            </ul>
-          </div>
-          </div>
-        </div>`;
+          		</div>
+        	</div>`;
 		});
 	} else {
 		output += `<div class="tutor-option-field-row"><div class="tutor-option-field-label"><p class="tutor-fs-7 tutor-fw-medium">No settings data found.</p></div></div>`;
 	}
-	const heading = `<div class="tutor-option-field-row"><div class="tutor-option-field-label"><p>Date</p></div></div>`;
+	const heading = `<div class="tutor-option-field-row"><div class="tutor-option-field-label">Date</div></div>`;
 
-	const historyData = selectorElement('.history_data');
+	const historyData = document.querySelector('.history_data');
 	null !== historyData ? (historyData.innerHTML = heading + output) : '';
 	export_single_settings();
 	// popupToggle();
@@ -127,7 +122,7 @@ function tutor_option_history_load(dataset) {
 /* import and list dom */
 
 const export_settings_all = () => {
-	const export_settings = selectorElement('#export_settings'); //document.querySelector("#export_settings");
+	const export_settings = document.querySelector('#tutor_export_settings');
 	if (export_settings) {
 		export_settings.onclick = (e) => {
 			var formData = new FormData();
@@ -157,7 +152,7 @@ const time_now = () => {
 };
 
 const reset_default_options = () => {
-	const reset_options = selectorElement('#reset_options');
+	const reset_options = document.querySelector('#tutor_reset_options');
 	if (reset_options) {
 		reset_options.onclick = function() {
 			modalConfirmation(reset_options);
@@ -166,6 +161,7 @@ const reset_default_options = () => {
 };
 
 const reset_all_settings_xhttp = (modalOpener, modalElement) => {
+	const { __ } = wp.i18n;
 	var formData = new FormData();
 	formData.append('action', 'tutor_option_default_save');
 	formData.append(_tutorobject.nonce_key, _tutorobject._tutor_nonce);
@@ -176,14 +172,15 @@ const reset_all_settings_xhttp = (modalOpener, modalElement) => {
 		if (xhttp.readyState === 4) {
 			setTimeout(function() {
 				modalElement.classList.remove('tutor-is-active');
-				tutor_toast('Success', 'Reset all settings to default successfully!', 'success');
+				document.body.classList.remove("tutor-modal-open");
+				tutor_toast(__('Success', 'tutor'), __('Reset all settings to default successfully!', 'tutor'), 'success');
 			}, 200);
 		}
 	};
 };
 
 const import_history_data = () => {
-	const import_options = selectorElement('#import_options');
+	const import_options = document.querySelector('#tutor_import_options');
 	if (import_options) {
 		import_options.onclick = (e) => {
 			modalConfirmation(import_options);
@@ -192,10 +189,11 @@ const import_history_data = () => {
 };
 
 const import_history_data_xhttp = (modalOpener, modalElement) => {
-	var fileElem = selectorElement('#drag-drop-input');
+	const { __ } = wp.i18n;
+	var fileElem = document.querySelector('#drag-drop-input');
 	var files = fileElem.files;
 	if (files.length <= 0) {
-		tutor_toast('Failed', 'Please add a correctly formated json file', 'error');
+		tutor_toast(__('Failed', 'tutor'), __('Please add a correctly formatted json file', 'tutor'), 'error');
 		return false;
 	}
 	var fr = new FileReader();
@@ -213,13 +211,14 @@ const import_history_data_xhttp = (modalOpener, modalElement) => {
 		xhttp.onreadystatechange = function() {
 			if (xhttp.readyState === 4) {
 				modalElement.classList.remove('tutor-is-active');
+				document.body.classList.remove("tutor-modal-open");
 				let historyData = JSON.parse(xhttp.response);
 				historyData = historyData.data;
 				tutor_option_history_load(Object.entries(historyData));
 				delete_history_data();
 				// import_history_data();
 				setTimeout(function() {
-					tutor_toast('Success', 'Data imported successfully!', 'success');
+					tutor_toast(__('Success', 'tutor'), __('Data imported successfully!', 'tutor'), 'success');
 					fileElem.parentNode.parentNode.querySelector('.file-info').innerText = '';
 					fileElem.value = '';
 				}, 200);
@@ -229,7 +228,7 @@ const import_history_data_xhttp = (modalOpener, modalElement) => {
 };
 
 const export_single_settings = () => {
-	const single_settings = selectorElements('.export_single_settings');
+	const single_settings = document.querySelectorAll('.export_single_settings');
 	if (single_settings) {
 		for (let i = 0; i < single_settings.length; i++) {
 			single_settings[i].onclick = function(e) {
@@ -247,7 +246,6 @@ const export_single_settings = () => {
 
 					xhttp.onreadystatechange = function() {
 						if (xhttp.readyState === 4) {
-							// let fileName = "tutor_options_" + _tutorobject.tutor_time_now;
 							let fileName = export_id;
 							json_download(xhttp.response, fileName);
 						}
@@ -261,8 +259,8 @@ const export_single_settings = () => {
 const modalConfirmation = (modalOpener) => {
 	let modalElement = document.getElementById(modalOpener.dataset.tutorModalTarget);
 	let confirmButton = modalElement && modalElement.querySelector('[data-reset]');
-	let modalHeading = modalElement && modalElement.querySelector('.tutor-modal-title');
-	let modalMessage = modalElement && modalElement.querySelector('.tutor-modal-message');
+	let modalHeading = modalElement && modalElement.querySelector('[data-modal-dynamic-title]');
+	let modalMessage = modalElement && modalElement.querySelector('[data-modal-dynamic-content]');
 
 	confirmButton.removeAttribute('data-reset-for');
 	confirmButton.classList.remove('reset_to_default');
@@ -291,7 +289,7 @@ const modalConfirmation = (modalOpener) => {
 };
 
 const modal_opener_single_settings = () => {
-	const apply_settings = selectorElements('.apply_settings');
+	const apply_settings = document.querySelectorAll('.apply_settings');
 	if (apply_settings) {
 		apply_settings.forEach((applyButton) => {
 			applyButton.onclick = () => {
@@ -302,6 +300,7 @@ const modal_opener_single_settings = () => {
 };
 
 const apply_settings_xhttp_request = (modelOpener, modalElement) => {
+	const { __ } = wp.i18n;
 	let apply_id = modelOpener.dataset.id;
 	var formData = new FormData();
 	formData.append('action', 'tutor_apply_settings');
@@ -316,13 +315,14 @@ const apply_settings_xhttp_request = (modelOpener, modalElement) => {
 	xhttp.onreadystatechange = function() {
 		if (xhttp.readyState === 4) {
 			modalElement.classList.remove('tutor-is-active');
-			tutor_toast('Success', 'Applied settings successfully!', 'success');
+			document.body.classList.remove("tutor-modal-open");
+			tutor_toast(__('Success', 'tutor'), __('Applied settings successfully!', 'tutor'), 'success');
 		}
 	};
 };
 
 const delete_history_data = () => {
-	const delete_settings = selectorElements('.delete_single_settings');
+	const delete_settings = document.querySelectorAll('.delete_single_settings');
 	if (delete_settings) {
 		delete_settings.forEach((deleteButton) => {
 			deleteButton.onclick = () => {
@@ -333,6 +333,7 @@ const delete_history_data = () => {
 };
 
 const delete_settings_xhttp_request = (modelOpener, modalElement) => {
+	const { __ } = wp.i18n;
 	let delete_id = modelOpener.dataset.id;
 	var formData = new FormData();
 	formData.append('action', 'tutor_delete_single_settings');
@@ -345,15 +346,15 @@ const delete_settings_xhttp_request = (modelOpener, modalElement) => {
 	xhttp.send(formData);
 	xhttp.onreadystatechange = function() {
 		if (xhttp.readyState === 4) {
-			// console.log(JSON.parse(xhttp.response));
 			modalElement.classList.remove('tutor-is-active');
+			document.body.classList.remove("tutor-modal-open");
 			let historyData = JSON.parse(xhttp.response);
 			historyData = historyData.data;
 			tutor_option_history_load(Object.entries(historyData));
 			delete_history_data();
 
-			setTimeout(function() {
-				tutor_toast('Success', 'Data deleted successfully!', 'success');
+			setTimeout(function () {
+				tutor_toast(__('Success', 'tutor'), __('Data deleted successfully!', 'tutor'), 'success');
 			}, 200);
 		}
 	};

@@ -1,10 +1,15 @@
 import '../admin-dashboard/segments/lib';
+import sprintf from '../helper/sprintf';
+import './_select_dd_search';
 import './course/index';
 import './dashboard';
 import './dashboard/export-csv';
+import './pages/billing';
+import './pages/cart';
+import './pages/checkout';
 import './pages/course-landing';
 import './pages/instructor-list-filter';
-import './_select_dd_search';
+
 /**
  * Codes from this file should be decentralized according to relavent file/folder structure.
  * It's a legacy file.
@@ -19,10 +24,10 @@ readyState_complete(() => {
 	});
 });
 
-jQuery(document).ready(function ($) {
+jQuery(document).ready(function($) {
 	'use strict';
 	/**
-	 * wp.i18n translateable functions
+	 * wp.i18n translatable functions
 	 * @since 1.9.0
 	 */
 	const { __, _x, _n, _nx } = wp.i18n;
@@ -32,7 +37,7 @@ jQuery(document).ready(function ($) {
 	 */
 	if (jQuery().select2) {
 		$('.tutor_select2').select2({
-			escapeMarkup: function (markup) {
+			escapeMarkup: function(markup) {
 				return markup;
 			},
 		});
@@ -49,13 +54,29 @@ jQuery(document).ready(function ($) {
 	 *  jquery.ui.widget.js
 	 *  jquery.ui.mouse.js
 	 */
-	!(function (a) {
+	!(function(a) {
 		function f(a, b) {
 			if (!(a.originalEvent.touches.length > 1)) {
 				a.preventDefault();
 				var c = a.originalEvent.changedTouches[0],
 					d = document.createEvent('MouseEvents');
-				d.initMouseEvent(b, !0, !0, window, 1, c.screenX, c.screenY, c.clientX, c.clientY, !1, !1, !1, !1, 0, null),
+				d.initMouseEvent(
+					b,
+					!0,
+					!0,
+					window,
+					1,
+					c.screenX,
+					c.screenY,
+					c.clientX,
+					c.clientY,
+					!1,
+					!1,
+					!1,
+					!1,
+					0,
+					null,
+				),
 					a.target.dispatchEvent(d);
 			}
 		}
@@ -64,19 +85,27 @@ jQuery(document).ready(function ($) {
 				b = a.ui.mouse.prototype,
 				c = b._mouseInit,
 				d = b._mouseDestroy;
-			(b._touchStart = function (a) {
+			(b._touchStart = function(a) {
 				var b = this;
 				!e &&
 					b._mouseCapture(a.originalEvent.changedTouches[0]) &&
-					((e = !0), (b._touchMoved = !1), f(a, 'mouseover'), f(a, 'mousemove'), f(a, 'mousedown'));
+					((e = !0),
+					(b._touchMoved = !1),
+					f(a, 'mouseover'),
+					f(a, 'mousemove'),
+					f(a, 'mousedown'));
 			}),
-				(b._touchMove = function (a) {
+				(b._touchMove = function(a) {
 					e && ((this._touchMoved = !0), f(a, 'mousemove'));
 				}),
-				(b._touchEnd = function (a) {
-					e && (f(a, 'mouseup'), f(a, 'mouseout'), this._touchMoved || f(a, 'click'), (e = !1));
+				(b._touchEnd = function(a) {
+					e &&
+						(f(a, 'mouseup'),
+						f(a, 'mouseout'),
+						this._touchMoved || f(a, 'click'),
+						(e = !1));
 				}),
-				(b._mouseInit = function () {
+				(b._mouseInit = function() {
 					var b = this;
 					b.element.bind({
 						touchstart: a.proxy(b, '_touchStart'),
@@ -85,7 +114,7 @@ jQuery(document).ready(function ($) {
 					}),
 						c.call(b);
 				}),
-				(b._mouseDestroy = function () {
+				(b._mouseDestroy = function() {
 					var b = this;
 					b.element.unbind({
 						touchstart: a.proxy(b, '_touchStart'),
@@ -105,60 +134,111 @@ jQuery(document).ready(function ($) {
 		ajaxurl: window._tutorobject.ajaxurl,
 		nonce_key: window._tutorobject.nonce_key,
 		played_once: false,
-		video_data: function () {
+		max_seek_time: 0,
+		video_data: function() {
 			const video_track_data = $('#tutor_video_tracking_information').val();
 			return video_track_data ? JSON.parse(video_track_data) : {};
 		},
-		track_player: function () {
+		track_player: function() {
 			const that = this;
 			if (typeof Plyr !== 'undefined') {
-				const player = new Plyr(this.player_DOM);
+				let syncTimeInterval;
 				const video_data = that.video_data();
-				player.on('ready', function (event) {
+				const player = new Plyr(this.player_DOM, {
+					keyboard: {
+						focused: that.isRequiredPercentage() ? false : true,
+						global: false,
+					},
+					listeners: {
+						...(that.isRequiredPercentage() && {
+							seek(e) {
+								const newTime = that.getTargetTime(player, e);
+								const currentTime = player.currentTime;
+								const max_seek_time = currentTime > that.max_seek_time ? currentTime : that.max_seek_time;
+								// Disallow moving forward
+								if (newTime > max_seek_time) {
+									e.preventDefault();
+									tutor_toast(__('Warning', 'tutor'), __('Forward seeking is disabled', 'tutor'), 'error');
+									return false;
+								}
+								return true;
+							},
+						}),
+					}
+				});
+				player.on('ready', function(event) {
 					const instance = event.detail.plyr;
 					const { best_watch_time = 0 } = video_data || {};
-					if (best_watch_time > 0 && instance.duration > Math.round(best_watch_time)) {
-						instance.media.currentTime = best_watch_time;
+					if (_tutorobject.tutor_pro_url && best_watch_time > 0) {
+						var previous_duration = Math.floor(best_watch_time);
+						var previousTimeSetter = setTimeout(function(){
+							if (player.playing !== true && player.currentTime !== previous_duration) {
+								if (instance.provider === 'youtube') {
+									instance.embed.seekTo(best_watch_time);
+								} else {
+									instance.media.currentTime = previous_duration;
+								}
+							} else {
+								clearTimeout(previousTimeSetter);
+							}
+						});
 					}
 					that.sync_time(instance);
 				});
+				
+				player.on('play', (event) => {
+					that.played_once = true;
 
-				let tempTimeNow = 0;
-				let intervalSeconds = 30; //Send to tutor backend about video playing time in this interval
-				player.on('timeupdate', function (event) {
+					// Send to tutor backend about video playing time in this interval
+					const intervalSeconds = 10;
 					const instance = event.detail.plyr;
-					const tempTimeNowInSec = tempTimeNow / 4; //timeupdate firing 250ms interval
-					if (tempTimeNowInSec >= intervalSeconds) {
+					syncTimeInterval = setInterval(() => {
 						that.sync_time(instance);
-						tempTimeNow = 0;
+					}, intervalSeconds * 1000);
+
+					if (_tutorobject.tutor_pro_url && player.provider === 'youtube') {
+						$('.plyr--youtube.plyr__poster-enabled .plyr__poster').css('opacity', 0);
 					}
-					tempTimeNow++;
 				});
 
-				player.on('play', ()=>{
-					that.played_once=true;
+				player.on('pause', (event) => {
+					clearInterval(syncTimeInterval);
+					const instance = event.detail.plyr;
+					that.sync_time(instance);
 				});
 
-				player.on('ended', function (event) {
+				player.on('ended', function(event) {
+					clearInterval(syncTimeInterval);
 					const video_data = that.video_data();
 					const instance = event.detail.plyr;
 					const data = { is_ended: true };
 					that.sync_time(instance, data);
-					console.log(video_data.autoload_next_course_content, that.played_once);
 					if (video_data.autoload_next_course_content && that.played_once) {
 						that.autoload_content();
+					}
+
+					if (_tutorobject.tutor_pro_url && player.provider === 'youtube') {
+						$('.plyr--youtube.plyr__poster-enabled .plyr__poster').css('opacity', 1);
 					}
 				});
 			}
 		},
-		sync_time: function (instance, options) {
-			const post_id = this.video_data().post_id;
+		sync_time: function(instance, options) {
+			const video_data = this.video_data();
+			if (!video_data) {
+				return;
+			}
+
+			if (this.isRequiredPercentage()) {
+				this.enable_complete_lesson_btn(instance);
+			}
+
 			//TUTOR is sending about video playback information to server.
 			let data = {
 				action: 'sync_video_playback',
 				currentTime: instance.currentTime,
 				duration: instance.duration,
-				post_id,
+				post_id: video_data.post_id,
 			};
 			data[this.nonce_key] = _tutorobject[this.nonce_key];
 			let data_send = data;
@@ -166,22 +246,83 @@ jQuery(document).ready(function ($) {
 				data_send = Object.assign(data, options);
 			}
 			$.post(this.ajaxurl, data_send);
+			
+			const seekTime = video_data.best_watch_time > instance.currentTime ? video_data.best_watch_time : instance.currentTime;
+			if (seekTime > this.max_seek_time) {
+				this.max_seek_time = seekTime;
+			}
 		},
-		autoload_content: function () {
+		autoload_content: function() {
 			console.log('Autoloader called');
 			const post_id = this.video_data().post_id;
 			const data = { action: 'autoload_next_course_content', post_id };
 			data[this.nonce_key] = _tutorobject[this.nonce_key];
-			$.post(this.ajaxurl, data).done(function (response) {
+			$.post(this.ajaxurl, data).done(function(response) {
 				console.log(response);
 				if (response.success && response.data.next_url) {
 					location.href = response.data.next_url;
 				}
 			});
 		},
-		init: function (element) {
+		isRequiredPercentage: function() {
+			const video_data = this.video_data();
+			if (!video_data) {
+				return false;
+			}
+
+			const { strict_mode, control_video_lesson_completion, lesson_completed, is_enrolled } = video_data;
+			if (_tutorobject.tutor_pro_url && is_enrolled && !lesson_completed && strict_mode && control_video_lesson_completion) {
+				return true;
+			}
+			return false;
+		},
+		enable_complete_lesson_btn: function(instance) {
+			const complete_lesson_btn = $('button[name="complete_lesson_btn"]');
+			const video_data = this.video_data();
+			const completedPercentage = this.getPercentage(Number(instance.currentTime), Number(instance.duration));
+			
+			if (completedPercentage >= video_data.required_percentage) {
+				complete_lesson_btn.attr('disabled', false);
+				complete_lesson_btn.next().remove();
+			}
+		},
+		disable_complete_lesson_btn: function() {
+			const video_data = this.video_data();
+			if (!video_data) {
+				return;
+			}
+
+			const { best_watch_time, video_duration, required_percentage } = video_data;
+			const completedPercentage = this.getPercentage(Number(best_watch_time), Number(video_duration));
+			
+			if (completedPercentage < required_percentage) {
+				const complete_lesson_btn = $('button[name="complete_lesson_btn"]');
+				complete_lesson_btn.attr('disabled', true);
+				complete_lesson_btn.wrap('<div class="tooltip-wrap"></div>').after(`<span class="tooltip-txt tooltip-bottom">${ sprintf( __( 'Watch at least %s% to complete the lesson.', 'tutor' ), video_data.required_percentage ) }</span>`);
+			}
+		},
+		getPercentage: function(value, total) {
+			if (value > 0 && total > 0) {
+				return Math.round((value / total) * 100);
+			}
+			return 0;
+		},
+		getTargetTime: function(player, input) {
+			if (
+			  typeof input === "object" &&
+			  (input.type === "input" || input.type === "change")
+			) {
+			  return input.target.value / input.target.max * player.media.duration;
+			} else {
+			  return Number(input);
+			}
+		},
+		init: function(element) {
 			this.player_DOM = element;
 			this.track_player();
+			if (this.isRequiredPercentage()) {
+				this.disable_complete_lesson_btn();
+			}
 		},
 	};
 
@@ -189,11 +330,11 @@ jQuery(document).ready(function ($) {
 	 * Fire TUTOR video
 	 * @since v.1.0.0
 	 */
-	$('.tutorPlayer').each(function () {
+	$('.tutorPlayer').each(function() {
 		videoPlayer.init(this);
 	});
 
-	$(document).on('change keyup paste', '.tutor_user_name', function () {
+	$(document).on('change keyup paste', '.tutor_user_name', function() {
 		$(this).val(tutor_slugify($(this).val()));
 	});
 
@@ -208,13 +349,13 @@ jQuery(document).ready(function ($) {
 			.replace(/-+$/, ''); // Trim - from end of text
 	}
 
-	$(document).on('click', '.tutor_question_cancel', function (e) {
+	$(document).on('click', '.tutor_question_cancel', function(e) {
 		e.preventDefault();
 		$('.tutor-add-question-wrap').toggle();
 	});
 
 	// Quiz Review : Tooltip
-	$('.tooltip-btn').on('hover', function (e) {
+	$('.tooltip-btn').on('hover', function(e) {
 		$(this).toggleClass('active');
 	});
 
@@ -224,7 +365,9 @@ jQuery(document).ready(function ($) {
 	 * Toggle topic summery
 	 * @since v.1.6.9
 	 */
-	$('.tutor-course-title h4 .toggle-information-icon').on('click', function (e) {
+	$('.tutor-course-title h4 .toggle-information-icon').on('click', function(
+		e,
+	) {
 		$(this)
 			.closest('.tutor-topics-in-single-lesson')
 			.find('.tutor-topics-summery')
@@ -235,7 +378,7 @@ jQuery(document).ready(function ($) {
 	$('.tutor-course-topic.tutor-active')
 		.find('.tutor-course-lessons')
 		.slideDown();
-	$('.tutor-course-title').on('click', function () {
+	$('.tutor-course-title').on('click', function() {
 		var lesson = $(this).siblings('.tutor-course-lessons');
 		$(this)
 			.closest('.tutor-course-topic')
@@ -243,95 +386,49 @@ jQuery(document).ready(function ($) {
 		lesson.slideToggle();
 	});
 
-	$(document).on('click', '.tutor-topics-title h3 .toggle-information-icon', function (e) {
-		$(this)
-			.closest('.tutor-topics-in-single-lesson')
-			.find('.tutor-topics-summery')
-			.slideToggle();
-		e.stopPropagation();
-	});
+	$(document).on(
+		'click',
+		'.tutor-topics-title h3 .toggle-information-icon',
+		function(e) {
+			$(this)
+				.closest('.tutor-topics-in-single-lesson')
+				.find('.tutor-topics-summery')
+				.slideToggle();
+			e.stopPropagation();
+		},
+	);
 
-	/**
-	 * Check if lesson has classic editor support
-	 * If classic editor support, stop ajax load on the lesson page.
-	 *
-	 * @since v.1.0.0
-	 *
-	 * @updated v.1.4.0
-	 */
-	/* if (!_tutorobject.enable_lesson_classic_editor) {
-		$(document).on('click', '.tutor-single-lesson-a', function(e) {
-			e.preventDefault();
-
-			var $that = $(this);
-			var lesson_id = $that.attr('data-lesson-id');
-			var $wrap = $('#tutor-single-entry-content');
-
-			$.ajax({
-				url: _tutorobject.ajaxurl,
-				type: 'POST',
-				data: { lesson_id: lesson_id, action: 'tutor_render_lesson_content' },
-				beforeSend: function() {
-					var page_title = $that.find('.lesson_title').text();
-					$('head title').text(page_title);
-					window.history.pushState('obj', page_title, $that.attr('href'));
-					$wrap.addClass('loading-lesson');
-					$('.tutor-single-lesson-items').removeClass('active');
-					$that.closest('.tutor-single-lesson-items').addClass('active');
-				},
-				success: function(data) {
-					$wrap.html(data.data.html);
-					videoPlayer.init();
-					$('.tutor-lesson-sidebar').css('display', '');
-					window.dispatchEvent(new window.Event('tutor_ajax_lesson_loaded')); // Some plugins like h5p needs notification on ajax load
-				},
-				complete: function() {
-					$wrap.removeClass('loading-lesson');
-				},
-			});
-		});
-
-		$(document).on('click', '.sidebar-single-quiz-a', function(e) {
-			e.preventDefault();
-
-			var $that = $(this);
-			var quiz_id = $that.attr('data-quiz-id');
-			var page_title = $that.find('.lesson_title').text();
-			var $wrap = $('#tutor-single-entry-content');
-
-			$.ajax({
-				url: _tutorobject.ajaxurl,
-				type: 'POST',
-				data: { quiz_id: quiz_id, action: 'tutor_render_quiz_content' },
-				beforeSend: function() {
-					$('head title').text(page_title);
-					window.history.pushState('obj', page_title, $that.attr('href'));
-					$wrap.addClass('loading-lesson');
-					$('.tutor-single-lesson-items').removeClass('active');
-					$that.closest('.tutor-single-lesson-items').addClass('active');
-				},
-				success: function(data) {
-					$wrap.html(data.data.html);
-					$('.tutor-lesson-sidebar').css('display', '');
-				},
-				complete: function() {
-					$wrap.removeClass('loading-lesson');
-				},
-			});
-		});
-	} */
-
-	/**
-	 * @date 05 Feb, 2019
-	 */
-
-	$(document).on('click', '.tutor-lesson-sidebar-hide-bar', function (e) {
+	// toggle topics sidebar
+	$(document).on('click', '[tutor-course-topics-sidebar-toggler]', function(
+		e,
+	) {
 		e.preventDefault();
-		$('.tutor-course-single-sidebar-wraper.tutor-desktop-sidebar').toggle();
-		$('#tutor-single-entry-content').toggleClass('sidebar-hidden');
+		$('.tutor-course-single-content-wrapper').toggleClass(
+			'tutor-course-single-sidebar-hidden',
+		);
 	});
 
-	$('.tutor-tabs-btn-group a').on('click touchstart', function (e) {
+	$('[tutor-course-topics-sidebar-offcanvas-toggler]').on('click', function(
+		event,
+	) {
+		event.preventDefault();
+		$('.tutor-course-single-content-wrapper').toggleClass(
+			'tutor-course-single-sidebar-open',
+		);
+		$('body').toggleClass('tutor-overflow-hidden');
+	});
+
+	$('[tutor-hide-course-single-sidebar]').on('click', function(event) {
+		event.preventDefault();
+		console.log('Hello');
+		$('.tutor-course-single-content-wrapper').removeClass(
+			'tutor-course-single-sidebar-open',
+		);
+		$('body').removeClass('tutor-overflow-hidden');
+	});
+
+	//@todo: to be removed
+	$('.tutor-tabs-btn-group a').on('click touchstart', function(e) {
 		e.preventDefault();
 		var $that = $(this);
 		var tabSelector = $that.attr('href');
@@ -353,7 +450,7 @@ jQuery(document).ready(function ($) {
 	 */
 	var countDraggableAnswers = $('.quiz-draggable-rand-answers').length;
 	if (countDraggableAnswers) {
-		$('.quiz-draggable-rand-answers').each(function () {
+		$('.quiz-draggable-rand-answers').each(function() {
 			var $that = $(this);
 			var draggableDivHeight = $that.height();
 
@@ -375,34 +472,33 @@ jQuery(document).ready(function ($) {
 	 *
 	 * @since v.1.2.0
 	 */
-	$(document).on('submit', '#tutor-withdraw-account-set-form', function (e) {
+	$(document).on('submit', '#tutor-withdraw-account-set-form', function(e) {
 		if (!e.detail || e.detail == 1) {
 			e.preventDefault();
 			var $form = $(this);
 			var $btn = $form.find('.tutor_set_withdraw_account_btn');
 			var data = $form.serializeObject();
-			$btn.prop("disabled", true);
+			$btn.prop('disabled', true);
 
 			$.ajax({
 				url: _tutorobject.ajaxurl,
 				type: 'POST',
 				data: data,
-				beforeSend: function () {
-					$btn.addClass('tutor-updating-message');
+				beforeSend: function() {
+					$btn.addClass('is-loading');
 				},
-				success: function (data) {
+				success: function(data) {
 					if (data.success) {
-						tutor_toast('Success!', data.data.msg, 'success');
+						tutor_toast(__('Success!', 'tutor'), data.data.msg, 'success');
 					}
 				},
-				complete: function () {
-					$btn.removeClass('tutor-updating-message');
+				complete: function() {
+					$btn.removeClass('is-loading');
 					setTimeout(() => {
-						$btn.prop("disabled", false);
+						$btn.prop('disabled', false);
 					}, 2000);
 				},
 			});
-
 		}
 	});
 
@@ -412,26 +508,7 @@ jQuery(document).ready(function ($) {
 	 * @since v.1.2.0
 	 */
 
-	$(document).on('click', '.open-withdraw-form-btn, .close-withdraw-form-btn', function (e) {
-		e.preventDefault();
-
-		if ($(this).data('reload') == 'yes') {
-			window.location.reload();
-			return;
-		}
-
-		$('.tutor-earning-withdraw-form-wrap')
-			.toggle()
-			.find('[name="tutor_withdraw_amount"]')
-			.val('');
-		$('.tutor-withdrawal-pop-up-success')
-			.hide()
-			.next()
-			.show();
-		$('html, body').css('overflow', $('.tutor-earning-withdraw-form-wrap').is(':visible') ? 'hidden' : 'auto');
-	});
-
-	$(document).on('submit', '#tutor-earning-withdraw-form', function (e) {
+	$(document).on('submit', '#tutor-earning-withdraw-form', function(e) {
 		e.preventDefault();
 
 		var $form = $(this);
@@ -443,27 +520,35 @@ jQuery(document).ready(function ($) {
 			url: _tutorobject.ajaxurl,
 			type: 'POST',
 			data: data,
-			beforeSend: function () {
+			beforeSend: function() {
 				$form.find('.tutor-success-msg').remove();
-				$btn.addClass('tutor-updating-message');
+				$btn.attr('disabled', 'disabled').addClass('is-loading');
 			},
-			success: function (data) {
+			success: function(data) {
 				var Msg;
 				$('.tutor-earning-withdraw-form-wrap').hide();
 				if (data.success) {
+					console.log(data.data.available_balance);
+
 					if (data.data.available_balance !== 'undefined') {
-						$('.withdraw-balance-col .available_balance').html(data.data.available_balance);
+						$('.withdraw-balance-col .available_balance').html(
+							data.data.available_balance,
+						);
 					}
+
 					tutor_toast(
 						__('Request Successful', 'tutor'),
-						__('Your request has been submitted. Please wait for the administrator’s response.', 'tutor'),
-						'success'
+						__(
+							"Your request has been submitted. Please wait for the administrator's response.",
+							'tutor',
+						),
+						'success',
 					);
-					setTimeout(function () {
+					setTimeout(function() {
 						location.reload();
 					}, 500);
 				} else {
-					tutor_toast('Error', data.data.msg, 'error');
+					tutor_toast(__('Error', 'tutor'), data.data.msg, 'error');
 					Msg =
 						'<div class="tutor-error-msg inline-image-text is-inline-block">\
                             <img src="' +
@@ -477,15 +562,14 @@ jQuery(document).ready(function ($) {
                             </div>\
                         </div>';
 
-					// $responseDiv.html(Msg);
-					setTimeout(function () {
+					setTimeout(function() {
 						$responseDiv.html('');
 					}, 5000);
 					return false;
 				}
 			},
-			complete: function () {
-				$btn.removeClass('tutor-updating-message');
+			complete: function() {
+				$btn.removeAttr('disabled').removeClass('is-loading');
 			},
 		});
 	});
@@ -493,12 +577,14 @@ jQuery(document).ready(function ($) {
 	/**
 	 * Delete Course
 	 */
-	$(document).on('click', '.tutor-dashboard-element-delete-btn', function (e) {
+	$(document).on('click', '.tutor-dashboard-element-delete-btn', function(e) {
 		e.preventDefault();
 		var element_id = $(this).attr('data-id');
 		$('#tutor-dashboard-delete-element-id').val(element_id);
 	});
-	$(document).on('submit', '#tutor-dashboard-delete-element-form', function (e) {
+	$(document).on('submit', '#tutor-dashboard-delete-element-form', function(
+		e,
+	) {
 		e.preventDefault();
 
 		var element_id = $('#tutor-dashboard-delete-element-id').val();
@@ -509,16 +595,18 @@ jQuery(document).ready(function ($) {
 			url: _tutorobject.ajaxurl,
 			type: 'POST',
 			data: data,
-			beforeSend: function () {
-				$btn.addClass('tutor-updating-message');
+			beforeSend: function() {
+				$btn.addClass('is-loading');
 			},
-			success: function (res) {
+			success: function(res) {
 				if (res.success) {
-					$('#tutor-dashboard-' + res.data.element + '-' + element_id).remove();
+					$(
+						'#tutor-dashboard-' + res.data.element + '-' + element_id,
+					).remove();
 				}
 			},
-			complete: function () {
-				$btn.removeClass('tutor-updating-message');
+			complete: function() {
+				$btn.removeClass('is-loading');
 			},
 		});
 	});
@@ -528,7 +616,7 @@ jQuery(document).ready(function ($) {
 	 *
 	 * @since v.1.3.3
 	 */
-	$(document).on('submit', '#tutor_assignment_start_form', function (e) {
+	$(document).on('submit', '#tutor_assignment_start_form', function(e) {
 		e.preventDefault();
 
 		var $that = $(this);
@@ -539,16 +627,23 @@ jQuery(document).ready(function ($) {
 			url: _tutorobject.ajaxurl,
 			type: 'POST',
 			data: form_data,
-			beforeSend: function () {
-				$('#tutor_assignment_start_btn').addClass('tutor-updating-message');
+			beforeSend: function() {
+				$('#tutor_assignment_start_btn').addClass('is-loading');
 			},
-			success: function (data) {
+			success: function(data) {
 				if (data.success) {
-					location.reload();
+					/**
+					 * The `true` value will force reload current page
+					 * from server instead of browser cache.
+					 */
+					location.reload(true);
 				}
 			},
-			complete: function () {
-				$('#tutor_assignment_start_btn').removeClass('tutor-updating-message');
+			error: function(xhr, status, error) {
+				 console.log('assignment start error: ' + error ); 
+			},
+			complete: function() {
+				$('#tutor_assignment_start_btn').removeClass('is-loading');
 			},
 		});
 	});
@@ -556,11 +651,19 @@ jQuery(document).ready(function ($) {
 	/**
 	 * Assignment answer validation
 	 */
-	$(document).on('submit', '#tutor_assignment_submit_form', function (e) {
+	$(document).on('submit', '#tutor_assignment_submit_form', function(e) {
 		var assignment_answer = tinymce.activeEditor.getContent();
 		if (assignment_answer.trim().length < 1) {
 			e.preventDefault();
-			tutor_toast(__('Warning', 'tutor'), __('Assignment answer is required.', 'tutor'), 'error');
+			tutor_toast(
+				__('Warning', 'tutor'),
+				__('Assignment answer is required.', 'tutor'),
+				'error',
+			);
+
+			setTimeout(() => {
+				jQuery('button#tutor_assignment_submit_btn').removeClass('is-loading').removeAttr('disabled')
+			}, 500)
 		}
 	});
 
@@ -568,72 +671,24 @@ jQuery(document).ready(function ($) {
 	 * Single Assignment Upload Button
 	 * @since v.1.3.4
 	 */
-	$('form').on('change', '.tutor-assignment-file-upload', function () {
+	$('form').on('change', '.tutor-assignment-file-upload', function() {
 		$(this)
 			.siblings('label')
 			.find('span')
 			.html(
 				$(this)
 					.val()
-					.replace(/.*(\/|\\)/, '')
+					.replace(/.*(\/|\\)/, ''),
 			);
 	});
 
 	/**
-	 * Lesson Sidebar Topic Toggle
-	 * @since v.1.3.4
+	 * Open the first lesson if all the lessons are closed
 	 */
-
-	$(document).on(
-		'click',
-		'.tutor-topics-in-single-lesson .tutor-topics-title, .tutor-single-lesson-topic-toggle',
-		function (e) {
-			var $that = $(this);
-			var $parent = $that.closest('.tutor-topics-in-single-lesson');
-			$parent.toggleClass('tutor-topic-active');
-			$parent.find('.tutor-lessons-under-topic').slideToggle();
-		}
-	);
-
-	$('.tutor-single-lesson-items.active')
-		.closest('.tutor-lessons-under-topic')
-		.show();
-	$('.tutor-single-lesson-items.active')
-		.closest('.tutor-topics-in-single-lesson')
-		.addClass('tutor-topic-active');
-	$('.tutor-course-lesson.active')
-		.closest('.tutor-lessons-under-topic')
-		.show();
-
-	/**
-	 *
-	 * @type {jQuery}
-	 *
-	 * Course builder auto draft save
-	 *
-	 * @since v.1.3.4
-	 */
-	var tutor_course_builder = $('input[name="tutor_action"]').val();
-	if (tutor_course_builder === 'tutor_add_course_builder') {
-		setInterval(auto_draft_save_course_builder, 30000);
-	}
-
-	function auto_draft_save_course_builder() {
-		var form_data = $('form#tutor-frontend-course-builder').serializeObject();
-		form_data.tutor_ajax_action = 'tutor_course_builder_draft_save';
-
-		$.ajax({
-			//url : _tutorobject.ajaxurl,
-			type: 'POST',
-			data: form_data,
-			beforeSend: function () {
-				$('.tutor-dashboard-builder-draft-btn span').text(__('Saving...', 'tutor'));
-			},
-			success: function (data) { },
-			complete: function () {
-				$('.tutor-dashboard-builder-draft-btn span').text(__('Save', 'tutor'));
-			},
-		});
+	if ($('.tutor-accordion-item-header.is-active').length === 0) {
+		$('.tutor-accordion-item-header')
+			.first()
+			.trigger('click');
 	}
 
 	/**
@@ -645,21 +700,21 @@ jQuery(document).ready(function ($) {
 	 * @since v.1.3.5
 	 */
 
-	$('.tutor-course-builder-section-title').on('click', function () {
+	$('.tutor-course-builder-section-title').on('click', function() {
 		if (
 			$(this)
 				.find('i')
-				.hasClass('tutor-icon-angle-up-filled')
+				.hasClass('tutor-icon-angle-up')
 		) {
 			$(this)
 				.find('i')
-				.removeClass('tutor-icon-angle-up-filled')
-				.addClass('tutor-icon-angle-down-filled');
+				.removeClass('tutor-icon-angle-up')
+				.addClass('tutor-icon-angle-down');
 		} else {
 			$(this)
 				.find('i')
-				.removeClass('tutor-icon-angle-down-filled')
-				.addClass('tutor-icon-angle-up-filled');
+				.removeClass('tutor-icon-angle-down')
+				.addClass('tutor-icon-angle-up');
 		}
 		$(this)
 			.next('div')
@@ -671,19 +726,19 @@ jQuery(document).ready(function ($) {
 	 * @since v.1.4.5
 	 */
 
-	$(document).on('click', '#tutor_profile_photo_button', function (e) {
+	$(document).on('click', '#tutor_profile_photo_button', function(e) {
 		e.preventDefault();
 
 		$('#tutor_profile_photo_file').trigger('click');
 	});
 
-	$(document).on('change', '#tutor_profile_photo_file', function (event) {
+	$(document).on('change', '#tutor_profile_photo_file', function(event) {
 		event.preventDefault();
 
 		var $file = this;
 		if ($file.files && $file.files[0]) {
 			var reader = new FileReader();
-			reader.onload = function (e) {
+			reader.onload = function(e) {
 				$('.tutor-profile-photo-upload-wrap')
 					.find('img')
 					.attr('src', e.target.result);
@@ -699,23 +754,28 @@ jQuery(document).ready(function ($) {
 	 * @since v.1.4.8
 	 */
 
-	$(document).on('click', '.thread-content .subject', function (e) {
+	$(document).on('click', '.thread-content .subject', function(e) {
 		var $btn = $(this);
 
-		var thread_id = parseInt($btn.closest('.thread-content').attr('data-thread-id'));
+		var thread_id = parseInt(
+			$btn.closest('.thread-content').attr('data-thread-id'),
+		);
 
 		var nonce_key = _tutorobject.nonce_key;
-		var json_data = { thread_id: thread_id, action: 'tutor_bp_retrieve_user_records_for_thread' };
+		var json_data = {
+			thread_id: thread_id,
+			action: 'tutor_bp_retrieve_user_records_for_thread',
+		};
 		json_data[nonce_key] = _tutorobject[nonce_key];
 
 		$.ajax({
 			type: 'POST',
 			url: window._tutorobject.ajaxurl,
 			data: json_data,
-			beforeSend: function () {
+			beforeSend: function() {
 				$('#tutor-bp-thread-wrap').html('');
 			},
-			success: function (data) {
+			success: function(data) {
 				if (data.success) {
 					$('#tutor-bp-thread-wrap').html(data.data.thread_head_html);
 					tutor_bp_setting_enrolled_courses_list();
@@ -725,14 +785,14 @@ jQuery(document).ready(function ($) {
 	});
 
 	function tutor_bp_setting_enrolled_courses_list() {
-		$('ul.tutor-bp-enrolled-course-list').each(function () {
+		$('ul.tutor-bp-enrolled-course-list').each(function() {
 			var $that = $(this);
 			var $li = $that.find(' > li');
 			var itemShow = 3;
 
 			if ($li.length > itemShow) {
 				var plusCourseCount = $li.length - itemShow;
-				$li.each(function (liIndex, liItem) {
+				$li.each(function(liIndex, liItem) {
 					var $liItem = $(this);
 
 					if (liIndex >= itemShow) {
@@ -755,7 +815,7 @@ jQuery(document).ready(function ($) {
 	}
 	tutor_bp_setting_enrolled_courses_list();
 
-	$(document).on('click', 'a.tutor_bp_plus_courses', function (e) {
+	$(document).on('click', 'a.tutor_bp_plus_courses', function(e) {
 		e.preventDefault();
 
 		var $btn = $(this);
@@ -773,14 +833,14 @@ jQuery(document).ready(function ($) {
 	 * @since v.1.5.1
 	 */
 	//$(document).on('click', '.tutor-dropbtn', function (e) {
-	$('.tutor-dropbtn').click(function () {
+	$('.tutor-dropbtn').click(function() {
 		var $content = $(this)
 			.parent()
 			.find('.tutor-dropdown-content');
 		$content.slideToggle(100);
 	});
 
-	$(document).on('click', function (e) {
+	$(document).on('click', function(e) {
 		var container = $('.tutor-dropdown');
 		var $content = container.find('.tutor-dropdown-content');
 		// if the target of the click isn't the container nor a descendant of the container
@@ -794,12 +854,14 @@ jQuery(document).ready(function ($) {
 	 *
 	 * @since  v.1.7.2
 	 */
-	var price_type = $('.tutor-frontend-builder-course-price [name="tutor_course_price_type"]');
+	var price_type = $(
+		'.tutor-frontend-builder-course-price [name="tutor_course_price_type"]',
+	);
 	if (price_type.length == 0) {
 		$('#_tutor_is_course_public_meta_checkbox').show();
 	} else {
 		price_type
-			.change(function () {
+			.change(function() {
 				if ($(this).prop('checked')) {
 					var method = $(this).val() == 'paid' ? 'hide' : 'show';
 					$('#_tutor_is_course_public_meta_checkbox')[method]();
@@ -815,17 +877,17 @@ jQuery(document).ready(function ($) {
 	 */
 	// Fully accessible tooltip jQuery plugin with delegation.
 	// Ideal for view containers that may re-render content.
-	(function ($) {
-		$.fn.tutor_tooltip = function () {
+	(function($) {
+		$.fn.tutor_tooltip = function() {
 			this
 
 				// Delegate to tooltip, Hide if tooltip receives mouse or is clicked (tooltip may stick if parent has focus)
-				.on('mouseenter click', '.tooltip', function (e) {
+				.on('mouseenter click', '.tooltip', function(e) {
 					e.stopPropagation();
 					$(this).removeClass('isVisible');
 				})
 				// Delegate to parent of tooltip, Show tooltip if parent receives mouse or focus
-				.on('mouseenter focus', ':has(>.tooltip)', function (e) {
+				.on('mouseenter focus', ':has(>.tooltip)', function(e) {
 					if (!$(this).prop('disabled')) {
 						// IE 8 fix to prevent tooltip on `disabled` elements
 						$(this)
@@ -834,7 +896,7 @@ jQuery(document).ready(function ($) {
 					}
 				})
 				// Delegate to parent of tooltip, Hide tooltip if parent loses mouse or focus
-				.on('mouseleave blur keydown', ':has(>.tooltip)', function (e) {
+				.on('mouseleave blur keydown', ':has(>.tooltip)', function(e) {
 					if (e.type === 'keydown') {
 						if (e.which === 27) {
 							$(this)
@@ -854,108 +916,28 @@ jQuery(document).ready(function ($) {
 	// Bind event listener to container element
 	jQuery('.tutor-tooltip-inside').tutor_tooltip();
 
-	/**
-	 * Manage course filter
-	 *
-	 * @since  v.1.7.2
-	 */
-	var filter_container = $('.tutor-course-filter-container form');
-	var loop_container = $('.tutor-course-filter-loop-container');
-	var column_per_row = $('.course_template_shortcode').data('column_per_row');
-	var course_per_page = $('.course_template_shortcode').data('course_per_page');
-	var page_shortcode = $('.course_template_shortcode').data('page_shortcode');
-	var filter_modifier = {};
-
-	// Sidebar checkbox value change
-	filter_container
-		.on('submit', function (e) {
-			e.preventDefault();
-			console.log('submitted');
-		})
-		.find('input')
-		.change(function (e) {
-			ajaxFilterArchive(e);
-		});
-
-
-	const ajaxFilterArchive = (e = null, page = null) => {
-		var filter_criteria = Object.assign(filter_container.serializeObject(), filter_modifier);
-		filter_criteria.page = page;
-		filter_criteria.page_shortcode = page_shortcode;
-		filter_criteria.column_per_row = column_per_row;
-		filter_criteria.course_per_page = course_per_page;
-		filter_criteria.action = 'tutor_course_filter_ajax';
-
-		console.log(filter_criteria);
-
-
-		loop_container.html('<div class="loading-spinner"></div>');
-		$(this)
-			.closest('form')
-			.find('.tutor-clear-all-filter')
-			.show();
-
-		$.ajax({
-			url: window._tutorobject.ajaxurl,
-			type: 'POST',
-			data: filter_criteria,
-			success: function (r) {
-				loop_container
-					.html(r)
-					.find('.tutor-pagination-wrap a')
-					.each(function () {
-						$(this)
-							.attr('data-href', $(this).attr('href'))
-							.attr('href', '#');
-					});
-
-			},
-			complete: function (c) {
-
-				selectSearchField('[name=tutor_course_filter]');
-
-				$('.course-archive-page .page-numbers').on('click', function (pe) {
-					pe.preventDefault();
-					ajaxFilterArchive(pe, $(this).data('pagenumber'))
-				})
-			}
-		});
-	}
-
-	if(loop_container.length > 0){
-		ajaxFilterArchive();
-	}
-
-	// Alter pagination
-	loop_container.on('click', '.tutor-pagination-wrap a', function (e) {
-		var url = $(this).data('href') || $(this).attr('href');
-
-		if (url) {
-			url = new URL(url);
-			var page = url.searchParams.get('paged');
-
-			if (page) {
-				e.preventDefault();
-				filter_modifier.page = page;
-				filter_container.find('input:first').trigger('change');
-			}
-		}
+	jQuery('.tutor-static-loader').click(function() {
+		setTimeout(() => {
+			jQuery(this)
+				.addClass('is-loading')
+				.attr('disabled', 'disabled');
+		}, 100);
 	});
 
-	// Alter sort filter
-	loop_container.on('change', 'select[name="tutor_course_filter"]', function () {
-		filter_modifier.tutor_course_filter = $(this).val();
-		filter_container.find('input:first').trigger('change');
-		ajaxFilterArchive();
-	});
-
-	// Refresh page after coming back to course archive page from cart
-	var archive_loop = $('.tutor-course-loop');
-	if (archive_loop.length > 0) {
-		window.sessionStorage.getItem('tutor_refresh_archive') === 'yes' ? window.location.reload() : 0;
-		window.sessionStorage.removeItem('tutor_refresh_archive');
-		archive_loop.on('click', '.tutor-loop-cart-btn-wrap', function () {
-			window.sessionStorage.setItem('tutor_refresh_archive', 'yes');
-		});
+	// Show the snackbar
+	const snackbar = document.getElementById('tutor-reuseable-snackbar');
+	if (snackbar) {
+		// Apply the animation class after a short delay
+		setTimeout(function() {
+			snackbar.classList.add('tutor-snackbar-show');
+		}, 1000); // Adjust the delay (in milliseconds) as needed
 	}
+	
+	jQuery('#tutor-registration-form [name="password_confirmation"]').on('input', function(){
+        let original = jQuery('[name="password"]');
+        let val = (original.val() || '').trim();
+        let matched = val && jQuery(this).val() === val;
+        
+        jQuery(this).parent().find('.tutor-validation-icon')[matched ? 'show' : 'hide']();
+    });
 });

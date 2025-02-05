@@ -23,9 +23,13 @@ window.jQuery(document).ready(function($) {
 	});
 
 	// Ajax action
-	$(document).on('click', '.tutor-list-ajax-action', function (e) {
+	$(document).on('click', '.tutor-list-ajax-action', function(e) {
 		if (!e.detail || e.detail == 1) {
+			e.preventDefault();
+
 			let $that = $(this);
+			let modal = $that.closest('.tutor-modal');
+			let buttonContent = $that.html();
 			let prompt = $(this).data('prompt');
 			let del = $(this).data('delete_element_id');
 			let redirect = $(this).data('redirect_to');
@@ -36,24 +40,20 @@ window.jQuery(document).ready(function($) {
 				return;
 			}
 
-			e.preventDefault();
-
-			const btnInnerHtml = $that.html().trim();
-			const { width: btnWidth, height: btnHeight } = $that.get(0).getBoundingClientRect();
-			const btnStyles = { width: `${btnWidth}px`, height: `${btnHeight}px` };
-
 			$.ajax({
 				url: _tutorobject.ajaxurl,
 				type: 'POST',
 				data: data,
-				beforeSend: function () {
-					$that.css(btnStyles);
-					$that.html(`<div class="tutor-loading-spinner" style="--size: 20px"></div>`);
+				beforeSend: function() {
+					$that
+						.text(__('Deleting...', 'tutor'))
+						.attr('disabled', 'disabled')
+						.addClass('is-loading');
 				},
-				success: function (data) {
+				success: function(data) {
 					if (data.success) {
 						if (del) {
-							$('#' + del).fadeOut(function () {
+							$('#' + del).fadeOut(function() {
 								$(this).remove();
 							});
 						}
@@ -65,54 +65,50 @@ window.jQuery(document).ready(function($) {
 					}
 
 					let { message = __('Something Went Wrong!', 'tutor') } = data.data || {};
-					tutor_toast('Error!', message, 'error');
+					tutor_toast(__('Error!', 'tutor'), message, 'error');
 				},
-				error: function () {
-					tutor_toast('Error!', __('Something Went Wrong!', 'tutor'), 'error');
+				error: function() {
+					tutor_toast(__('Error!', 'tutor'), __('Something Went Wrong!', 'tutor'), 'error');
 				},
-				complete: function () {
-					$that.html(btnInnerHtml);
+				complete: function() {
+					$that
+						.html(buttonContent)
+						.removeAttr('disabled')
+						.removeClass('is-loading');
+
+					if (modal.length !== 0) {
+						$('body').removeClass('tutor-modal-open');
+						modal.removeClass('tutor-is-active');
+					}
 				},
 			});
 		}
 	});
 
 	// Textarea auto height
-	$(document).on('input', '.tutor-textarea-auto-height', function() {
+	$(document).on('input', '.tutor-form-control-auto-height', function() {
 		this.style.height = 'auto';
 		this.style.height = this.scrollHeight + 'px';
 	});
-	$('.tutor-textarea-auto-height').trigger('input');
+	$('.tutor-form-control-auto-height').trigger('input');
 
 	// Prevent number input out of range
 	$(document).on(
 		'input',
 		'input.tutor-form-control[type="number"], input.tutor-form-number-verify[type="number"]',
 		function() {
-			if ($(this).val() == '') {
+			var value = $(this).val(); 
+			if (value == '') {
 				$(this).val('');
 				return;
 			}
-
-			let min = $(this).attr('min');
-			let max = $(this).attr('max');
-
-			let val = $(this)
-				.val()
-				.toString();
-			/\D/.test(val) ? (val = '') : 0;
-			val = parseInt(val || 0);
-
-			$(this).val(Math.abs($(this).val()));
-
-			// Prevent number smaller than min
-			if (!(min === undefined)) {
-				val < parseInt(min) ? $(this).val(min) : 0;
-			}
-
-			// Prevent numbers greater than max
-			if (!(max === undefined)) {
-				val > max ? $(this).val(max) : 0;
+			// Allow only 2 decimal places.
+			if (value.includes('.')) {
+				var decimal = String(value).split('.')[1].length;
+				console.log( decimal);
+				if (decimal > 2) {
+					$(this).val(parseFloat(value).toFixed(2));
+				}
 			}
 		},
 	);
@@ -121,5 +117,20 @@ window.jQuery(document).ready(function($) {
 	$(document).on('change', '.tutor-select-redirector', function() {
 		let url = $(this).val();
 		window.location.assign(url);
+	});
+
+	/**
+	 * Toggle switch button handler.
+	 *
+	 * @since 1.0.0
+	 */
+	const toggleChange = document.querySelectorAll('.tutor-form-toggle-input');
+	toggleChange.forEach((element) => {
+		element.addEventListener('change', (e) => {
+			let check_value = element.previousElementSibling;
+			if (check_value) {
+				check_value.value == 'on' ? (check_value.value = 'off') : (check_value.value = 'on');
+			}
+		});
 	});
 });
