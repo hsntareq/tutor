@@ -1,4 +1,4 @@
-import {get_response_message} from '../../helper/response';
+import { get_response_message } from '../../helper/response';
 
 // SVG Icons Totor V2
 const tutorIconsV2 = {
@@ -15,7 +15,7 @@ const tutorIconsV2 = {
 // Tutor v2 icons
 const { angleRight, magnifyingGlass, warning } = tutorIconsV2;
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
 	var $ = window.jQuery;
 	const { __ } = wp.i18n;
 
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		// );
 		let image_delete = image_upload_wrap.querySelector('.delete-btn');
 
-		image_uploader[i].onclick = function(e) {
+		image_uploader[i].onclick = function (e) {
 			e.preventDefault();
 
 			var image_frame = wp.media({
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
 				upload_previewer.src = image_input.value = image_url;
 			}); */
 
-			image_frame.on('insert', function(selection) {
+			image_frame.on('insert', function (selection) {
 				var state = image_frame.state();
 				selection = selection || state.get('selection');
 				if (!selection) return;
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			});
 		};
 
-		image_delete.onclick = function() {
+		image_delete.onclick = function () {
 			input_file.value = '';
 			email_title_logo.src = '';
 		};
@@ -87,11 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
 		return re.test(String(email).toLowerCase());
 	};
 
-	$(window).on('click', function(e) {
+	$(window).on('click', function (e) {
 		$('.tutor-notification, .search_result').removeClass('show');
 	});
 
-	$('.tutor-notification-close').click(function(e) {
+	$('.tutor-notification-close').click(function (e) {
 		$('.tutor-notification').removeClass('show');
 	});
 
@@ -111,17 +111,33 @@ document.addEventListener('DOMContentLoaded', function() {
 		});
 	};
 
+	const checkNumberFields = (inputFields) => {
+		inputFields.forEach((numberField) => {
+			numberField.oninput = (e) => {
+				const { target } = e;
+				const min = Number(target.getAttribute('min') || -Infinity);
+				const max = Number(target.getAttribute('max') || Infinity);
+				const numberType = target.getAttribute('data-number-type') || 'decimal';
+				const value = Number(target.value);
+
+				if (min !== -Infinity && value <= min) e.target.value = min;
+				if (max !== Infinity && value >= max) e.target.value = max;
+				if (['integer', 'int'].includes(numberType)) e.target.value = parseInt(e.target.value)
+			};
+		});
+	};
+
 	const checkEmailFieldsOnSubmit = (inputFields) => {
 		inputFields.forEach((emailField) => {
 			let pageNeedsValidation = emailField.closest('.tutor-option-nav-page');
-			let invalidLabel = emailField && emailField.parentNode.parentNode.querySelector('h5').innerText;
-			let pageTitle = pageNeedsValidation && pageNeedsValidation.querySelector('h2').innerText;
+			let invalidLabel = emailField && emailField.parentNode.parentNode.querySelector('[tutor-option-name]').innerText;
+			let pageTitle = pageNeedsValidation && pageNeedsValidation.querySelector('[tutor-option-title]').innerText;
 
 			let invalidMessage = '"' + pageTitle + ' > ' + invalidLabel + '" email is invalid!';
-			if (false === validateEmail(emailField.value)) {
+			if (emailField.value && false === validateEmail(emailField.value)) {
 				emailField.style.borderColor = 'red';
 				emailField.focus();
-				tutor_toast('Warning', invalidMessage, 'error');
+				tutor_toast(__('Warning', 'tutor'), invalidMessage, 'error');
 			} else {
 				formSubmit = true;
 			}
@@ -134,21 +150,29 @@ document.addEventListener('DOMContentLoaded', function() {
 		});
 	};
 
-	const inputEmailFields = document.querySelectorAll('[type="email"]');
-	const inputNumberFields = document.querySelectorAll('[type="number"]');
+	const inputEmailFields = document.querySelectorAll('.tutor-form-control[type="email"]');
+	// const inputEmailFields = document.querySelectorAll('[type="email"]');
+	const inputNumberFields = document.querySelectorAll('.tutor-form-control[type="number"]');
+	// const inputNumberFields = document.querySelectorAll('[type="number"]');
+
+	if (inputNumberFields.length) checkNumberFields(inputNumberFields);
+
 	if (0 !== inputEmailFields.length) {
 		checkEmailFields(inputEmailFields);
 	} else {
 		formSubmit = true;
 	}
 
-	$('#save_tutor_option').click(function(e) {
+	$('#save_tutor_option').click(function (e) {
 		e.preventDefault();
 		$('#tutor-option-form').submit();
 	});
 
-	$('#tutor-option-form').submit(function(e) {
+	$('#tutor-option-form').submit(function (e) {
 		e.preventDefault();
+		if (tinyMCE) {
+			tinyMCE.triggerSave();
+		}
 		var button = $('#save_tutor_option');
 		var $form = $(this);
 		var data = $form.serializeObject();
@@ -162,7 +186,13 @@ document.addEventListener('DOMContentLoaded', function() {
 			checkEmailFieldsOnSubmit(inputEmailFields);
 		}
 
-		// console.log(formSubmit);
+
+		// Only keep action and properties that starts with tutor_option
+		data = Object.fromEntries(
+			Object.entries(data).filter(([key, value]) => {
+				return key === 'action' || key.startsWith('tutor_option');
+			})
+		);
 
 		if (true === formSubmit) {
 			if (!e.detail || e.detail == 1) {
@@ -170,42 +200,35 @@ document.addEventListener('DOMContentLoaded', function() {
 					url: window._tutorobject.ajaxurl,
 					type: 'POST',
 					data: data,
-					beforeSend: function() {
-						button.addClass('tutor-updating-message');
+					beforeSend: function () {
+						button.addClass('is-loading');
+						button.attr('disabled', true);
 					},
-					success: function(resp) {
-						const { data = {}, success } = resp || {};
-						const { message = __('Something Went Wrong!', 'tutor') } = data;
+					success: function (resp) {
+						const { data = {}, success, message = __('Settings Saved', 'tutor'), reload_required = false } = resp || {};
 
 						if (success) {
-							// Disableing save btn after saved successfully
+							// Disabling save btn after saved successfully
 							if (document.getElementById('save_tutor_option')) {
 								document.getElementById('save_tutor_option').disabled = true;
 							}
-							tutor_toast('Success!', __('Settings Saved', 'tutor'), 'success');
-							return;
+							tutor_toast(__('Success!', 'tutor'), message, 'success');
+							window.dispatchEvent(new CustomEvent('tutor_option_saved', { detail: data }));
+							if (reload_required) {
+								window.location.reload(true);
+							}
+						} else {
+							tutor_toast(__('Warning!', 'tutor'), message, 'warning');
 						}
-
-						tutor_toast('Error!', message, 'error');
 					},
-					complete: function() {
-						button.removeClass('tutor-updating-message');
+					complete: function () {
+						button.removeClass('is-loading');
+						button.attr('disabled', 'disabled');
 					},
 				});
 			}
 		}
 	});
-
-	function titleCase(str) {
-		var splitStr = str.toLowerCase().split(' ');
-		for (var i = 0; i < splitStr.length; i++) {
-			// You do not need to check if i is larger than splitStr length, as your for does that for you
-			// Assign it back to the array
-			splitStr[i] = splitStr[i].charAt(0).toUpperCase() + splitStr[i].substring(1);
-		}
-		// Directly return the joined string
-		return splitStr.join(' ');
-	}
 
 	function view_item(text, section_slug, section, block, field_key) {
 		var navTrack = block ? `${angleRight} ${block}` : '';
@@ -228,15 +251,15 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 
 	let wait_for_input;
-	$('#search_settings').on('input', function(e) {
+	$('#search_settings').on('input', function (e) {
 		e.preventDefault();
+		let $this = $(this);
 
-		if(wait_for_input) {
-			// Prevent high rate input
+		if (wait_for_input) {
 			window.clearTimeout(wait_for_input);
 		}
 
-		wait_for_input = window.setTimeout(()=>{
+		wait_for_input = window.setTimeout(() => {
 			if (e.target.value) {
 				var searchKey = this.value;
 				$.ajax({
@@ -246,16 +269,18 @@ document.addEventListener('DOMContentLoaded', function() {
 						action: 'tutor_option_search',
 						keyword: searchKey,
 					},
-					// beforeSend: function () {},
-					success: function(data) {
 
-						if(!data.success) {
+					beforeSend: function () {
+						$this.parent().find('.tutor-form-icon').removeClass('tutor-icon-search').addClass('tutor-icon-circle-notch tutor-animation-spin');
+					},
+
+					success: function (data) {
+
+						if (!data.success) {
 							tutor_toast(__('Error', 'tutor'), get_response_message(data), 'error');
 							return;
 						}
 
-						// console.log(data.data);
-						// return false;
 						var output = '',
 							wrapped_item = '',
 							notfound = true,
@@ -268,14 +293,13 @@ document.addEventListener('DOMContentLoaded', function() {
 							field_key = '',
 							result = data.data.fields;
 
-						Object.values(result).forEach(function(item, index, arr) {
+						Object.values(result).forEach(function (item, index, arr) {
 							item_text = item.label;
 							section_slug = item.section_slug;
 							section_label = item.section_label;
 							block_label = item.block_label;
 							field_key = item.event ? item.key + '_' + item.event : item.key;
 							searchKeyRegex = new RegExp(searchKey, 'ig');
-							// console.log(item_text.match(searchKeyRegex));
 							matchedText = item_text.match(searchKeyRegex)?.[0];
 
 							if (matchedText) {
@@ -289,16 +313,16 @@ document.addEventListener('DOMContentLoaded', function() {
 							}
 						});
 						if (notfound) {
-							output += `<div class="no_item"> ${warning} No Results Found</div>`;
+							output += `<div class="no_item">${warning} No Results Found</div>`;
 						}
-						$('.search_result')
-							.html(output)
-							.addClass('show');
+
+						$('.search_result').html(output).addClass('show');
+
+						$this.parent().find('.tutor-form-icon').removeClass('tutor-icon-circle-notch tutor-animation-spin').addClass('tutor-icon-search');
+
 						output = '';
-						// console.log("working");
 					},
-					complete: function() {
-						// Active navigation element
+					complete: function () {
 						navigationTrigger();
 					},
 				});
@@ -314,31 +338,29 @@ document.addEventListener('DOMContentLoaded', function() {
 	 * Search suggestion, navigation trigger
 	 */
 	function navigationTrigger() {
-		const suggestionLinks = document.querySelectorAll('.search-field .search-popup-opener a');
-		const navTabItems = document.querySelectorAll('li.tutor-option-nav-item a');
+		const suggestionLinks = document.querySelectorAll('.tutor-options-search .search-popup-opener a');
+		const navTabItems = document.querySelectorAll('[tutor-option-tabs] li > a');
 		const navPages = document.querySelectorAll('.tutor-option-nav-page');
 
 		suggestionLinks.forEach((link) => {
 			link.addEventListener('click', (e) => {
 				const dataTab = e.target.closest('[data-tab]').dataset.tab;
 				const dataKey = e.target.closest('[data-key]').dataset.key;
-				// console.log('clicked search');
 				if (dataTab) {
-					document.title = e.target.innerText + ' ‹ ' + _tutorobject.site_title;
-					// remove active from other buttons
+					document.title = e.target.innerText + ' < ' + _tutorobject.site_title;
 					navTabItems.forEach((item) => {
-						item.classList.remove('active');
+						item.classList.remove('is-active');
 					});
 
 					// add active to the current nav item
-					document.querySelector(`.tutor-option-tabs [data-tab=${dataTab}]`).classList.add('active');
+					document.querySelector(`.tutor-option-tabs [data-tab=${dataTab}]`).classList.add('is-active');
 
 					// hide other tab contents
 					navPages.forEach((content) => {
-						content.classList.remove('active');
+						content.classList.remove('is-active');
 					});
 					// add active to the current content
-					document.querySelector(`.tutor-option-tab-pages #${dataTab}`).classList.add('active');
+					document.querySelector(`.tutor-option-tab-pages #${dataTab}`).classList.add('is-active');
 
 					// History push
 					const url = new URL(window.location);
@@ -348,7 +370,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 				// Reset + Hide Suggestion box
 				document.querySelector('.search-popup-opener').classList.remove('visible');
-				document.querySelector('.search-field input[type="search"]').value = '';
+				document.querySelector('.tutor-options-search input[type="search"]').value = '';
 				// Highlight selected element
 				highlightSearchedItem(dataKey);
 			});
@@ -360,18 +382,15 @@ document.addEventListener('DOMContentLoaded', function() {
 	 */
 	function highlightSearchedItem(dataKey) {
 		const target = document.querySelector(`#${dataKey}`);
-		const targetEl = target && target.querySelector(`.tutor-option-field-label h5.label`);
-		const scrollTargetEl = target && target.parentNode.querySelector('.tutor-option-field-row');
+		const targetEl = target && target.querySelector(`[tutor-option-name]`);
 
-		// console.log(`target -> ${target} scrollTarget -> ${scrollTargetEl}`);
-
-		if (scrollTargetEl) {
+		if (targetEl) {
 			targetEl.classList.add('isHighlighted');
 			setTimeout(() => {
 				targetEl.classList.remove('isHighlighted');
 			}, 6000);
 
-			scrollTargetEl.scrollIntoView({
+			targetEl.scrollIntoView({
 				behavior: 'smooth',
 				block: 'center',
 				inline: 'nearest',
@@ -381,35 +400,242 @@ document.addEventListener('DOMContentLoaded', function() {
 		}
 	}
 
-	/* var exporter = document.querySelector('#export_settings');
-	!exporter
-		? 0
-		: exporter.addEventListener('click', (e) => {
-				e.preventDefault();
-				fetch(_tutorobject.ajaxurl, {
-					method: 'POST',
-					credentials: 'same-origin',
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded',
-						'Cache-Control': 'no-cache',
-					},
-					body: new URLSearchParams({
-						action: 'tutor_export_settings',
-					}),
-				})
-					.then((response) => response.json())
-					.then((response) => {
-						const file = new Blob([JSON.stringify(response)], {
-							type: 'application/json',
-						});
+	/**
+	 * Highlight items form query params
+	 */
+	const urlParams = new URLSearchParams(window.location.search);
+	if (urlParams.get('highlight')) {
+		highlightSearchedItem(urlParams.get('highlight'));
+	}
 
-						let url = URL.createObjectURL(file);
-						let element = document.createElement('a');
-						element.setAttribute('href', url);
-						element.setAttribute('download', 'tutor_options');
-						element.click();
-						document.body.removeChild(element);
-					})
-					.catch((err) => console.log(err));
-		  }); */
+	/**
+	 * Input value change detector (Normal/Hidden input)
+	 * 
+	 * @param object	element 
+	 * @param function	callback 
+	 * @return void
+	 * 
+	 * @since 2.0.7
+	 */
+	function changeListener(element, callback) {
+		MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+		let observer = new MutationObserver(function (mutations, observer) {
+			if (mutations[0].attributeName == "value") {
+				if (typeof callback === 'function') {
+					callback(element.value)
+				}
+			}
+		});
+		observer.observe(element, {
+			attributes: true
+		});
+	}
+
+	/**
+	 * On toggle switch change - show, hide setting's elements
+	 * @since 2.1.9
+	 */
+	function showHideToggleChildren(el) {
+		let isChecked = el.is(':checked')
+		let fields = el.data('toggle-fields').split(',')
+		if (Array.isArray(fields) === false || fields.length === 0) return
+
+		fields = fields.map(s => s.trim());
+		isChecked
+			? fields.forEach((f) => $('#field_' + f).removeClass('tutor-hide-option'))
+			: fields.forEach((f) => $('#field_' + f).addClass('tutor-hide-option'))
+
+		let toggleWrapper = el.parent().parent().parent()
+		let sectionWrapper = el.parent().parent().parent().parent()
+		let visibleElements = sectionWrapper.find('.tutor-option-field-row').not('div.tutor-hide-option').length
+
+		visibleElements === 1
+			? toggleWrapper.addClass('tutor-option-no-bottom-border')
+			: toggleWrapper.removeClass('tutor-option-no-bottom-border')
+
+	}
+
+	const btnToggles = $('input[type="checkbox"][data-toggle-fields]')
+	btnToggles.each(function () {
+		showHideToggleChildren($(this))
+	})
+
+	btnToggles.change(function () {
+		showHideToggleChildren($(this))
+	})
+
+	/**
+	 * On toggle switch change - show, hide setting's blocks
+	 * @since 3.0.0
+	 */
+	function showHideToggleBlock(el) {
+		let isChecked = el.is(':checked')
+		let fields = el.data('toggle-blocks').split(',')
+		if (Array.isArray(fields) === false || fields.length === 0) return
+
+		fields = fields.map(s => s.trim());
+		fields.forEach((f) => {
+			if (isChecked) {
+				$(`.tutor-option-single-item.${f}`).removeClass('tutor-d-none');
+			} else {
+				$(`.tutor-option-single-item.${f}`).addClass('tutor-d-none');
+			}
+		});
+	}
+
+	const btnToggleBlocks = $('input[type="checkbox"][data-toggle-blocks]');
+	btnToggleBlocks.each(function () {
+		showHideToggleBlock($(this));
+	});
+
+	btnToggleBlocks.change(function () {
+		showHideToggleBlock($(this));
+	});
+
+	/**
+	 * Show/Hide setting option
+	 * @param object element			Dom object
+	 * @param conditionFn function	Condition function
+	 * @return void
+	 * 
+	 * @since 2.0.7
+	 */
+	function showHideOption(element, conditionFn) {
+		if (!element) return;
+
+		if (conditionFn()) {
+			element.classList.remove("tutor-d-none");
+		} else {
+			element.classList.add("tutor-d-none");
+		}
+
+		// Remove border if only one item left.
+		const blockWrapper = element.closest(".item-wrapper");
+		if (blockWrapper) {
+			const displayItems = blockWrapper.querySelectorAll(".tutor-option-field-row:not(.tutor-d-none)");
+			if (displayItems.length && displayItems.length === 1) {
+				displayItems[0].classList.add("tutor-option-no-bottom-border");
+			} else {
+				displayItems[0].classList.remove("tutor-option-no-bottom-border");
+			}
+		}
+	}
+
+	/**
+	 * Woocommerce order auto complete
+	 *
+	 * @since 2.0.5
+	 * 
+	 * Invoice generate options added
+	 *
+	 * @since 2.1.4
+	 * 
+	 * Monetization options refactored
+	 *
+	 * @since 3.0.0
+	 */
+	const monetization_field = document.querySelector("[name='tutor_option[monetize_by]']");
+	if (monetization_field) {
+		const monetized_by = monetization_field?.value;
+		const revenue_sharing_checkbox = document.querySelector("[data-toggle-fields=sharing_percentage]");
+		const revenue_sharing_engines = ['tutor', 'wc', 'edd', 'pmpro', 'restrict-content-pro'];
+
+		const woocommerce_block = document.querySelector(".tutor-option-single-item.woocommerce");
+		const currency_block = document.querySelector(".tutor-option-single-item.ecommerce_currency");
+		const revenue_sharing_block = document.querySelector(".tutor-option-single-item.revenue_sharing");
+		const fees_block = document.querySelector(".tutor-option-single-item.fees");
+		const withdraw_block = document.querySelector(".tutor-option-single-item.withdraw");
+		const invoice_block = document.querySelector(".tutor-option-single-item.ecommerce_invoice");
+
+		const cart_page_field = document.querySelector("#field_tutor_cart_page_id");
+		const checkout_page_field = document.querySelector("#field_tutor_checkout_page_id");
+
+		showHideOption(woocommerce_block, () => monetized_by === 'wc');
+		showHideOption(currency_block, () => monetized_by === 'tutor');
+		showHideOption(cart_page_field, () => monetized_by === 'tutor');
+		showHideOption(checkout_page_field, () => monetized_by === 'tutor');
+		showHideOption(invoice_block, () => monetized_by === 'tutor');
+
+		showHideOption(revenue_sharing_block, () => revenue_sharing_engines.includes(monetized_by));
+		showHideOption(fees_block, () => revenue_sharing_engines.includes(monetized_by) && revenue_sharing_checkbox?.checked);
+		showHideOption(withdraw_block, () => revenue_sharing_engines.includes(monetized_by) && revenue_sharing_checkbox?.checked);
+
+		// Handle monetization fields on change.
+		monetization_field.onchange = (e) => {
+			const value = e.target.value;
+			showHideOption(woocommerce_block, () => value === 'wc');
+			showHideOption(currency_block, () => value === 'tutor');
+			showHideOption(cart_page_field, () => value === 'tutor');
+			showHideOption(checkout_page_field, () => value === 'tutor');
+			showHideOption(invoice_block, () => value === 'tutor');
+
+			showHideOption(revenue_sharing_block, () => revenue_sharing_engines.includes(value));
+			showHideOption(fees_block, () => revenue_sharing_engines.includes(value) && revenue_sharing_checkbox?.checked);
+			showHideOption(withdraw_block, () => revenue_sharing_engines.includes(value) && revenue_sharing_checkbox?.checked);
+		}
+	}
+
+	/**
+	 * Maxlength counter for Textarea and Text field.
+	 * @since 2.2.3
+	 */
+	let maxLengthTargets = $('.tutor-option-field-input textarea[maxlength], .tutor-option-field-input input[maxlength]')
+	maxLengthTargets.each(function () {
+		let el = $(this),
+			max = $(this).attr('maxlength'),
+			len = $(this).val().length,
+			text = `${len}/${max}`;
+
+		el.css('margin-right', 0)
+		$(this).parent().append(`<div class="tutor-field-maxlength-info tutor-mr-4 tutor-fs-8 tutor-color-muted">${text}</div>`)
+	});
+
+	maxLengthTargets.keyup(function () {
+		let el = $(this),
+			max = $(this).attr('maxlength'),
+			len = $(this).val().length,
+			text = `${len}/${max}`;
+
+		el.parent().find('.tutor-field-maxlength-info').text(text)
+	})
+
+	/**
+	 * Tutor option password type hide and show
+	 * 
+	 * @since 3.0.0
+	 */
+	document.querySelectorAll('.tutor-option-field-input .tutor-type-password').forEach((item) => {
+		const input = item.querySelector('input');
+		const button = item.querySelector('button');
+		const icon = button?.querySelector('i');
+
+		if (!input || !button || !icon) {
+			return;
+		}
+
+		button.addEventListener('click', () => {
+			const isPassword = input.type === 'password';
+			input.type = isPassword ? 'text' : 'password';
+			icon.className = isPassword ? 'tutor-icon-eye-bold' : 'tutor-icon-eye-slash-bold';
+		});
+	});
+
+	/**
+	 * Tutor option withdraw bank transfer instruction hide and show
+	 * 
+	 * @since 3.0.0
+	 */
+	const bankTransferInput = document.querySelector('#tutor_check_bank_transfer_withdraw');
+	const bankTransferInstruction = document.querySelector('#field_tutor_bank_transfer_withdraw_instruction');
+	if (bankTransferInput && bankTransferInstruction) {
+		if (!bankTransferInput.checked) {
+			bankTransferInstruction.classList.add('tutor-d-none');
+			bankTransferInstruction.previousElementSibling?.classList.add('tutor-option-no-bottom-border');
+		}
+
+		bankTransferInput.addEventListener('change', (e) => {
+			bankTransferInstruction.classList.toggle('tutor-d-none', !e.target.checked);
+			bankTransferInstruction.previousElementSibling?.classList.toggle('tutor-option-no-bottom-border', !e.target.checked);
+		});
+	}
 });

@@ -16,6 +16,11 @@ window.jQuery(document).ready($=>{
     $(document).on('click', '.tutor-qna-badges-wrapper [data-action]', function(e){
         e.preventDefault();
         var $that = $(this);
+        
+        if($that.hasClass('is-loading')) {
+            return;
+        }
+
         let row = $(this).closest('tr');
         let qna_action = $(this).data('action');
         let question_id = $(this).closest('[data-question_id]').data('question_id');
@@ -32,17 +37,15 @@ window.jQuery(document).ready($=>{
                 action: 'tutor_qna_single_action'
             },
             beforeSend:() => {
-                $that.find('i').addClass('tutor-loading-spinner');
+                $that.addClass('is-loading');
             },
             success: resp=>{
                 if(!resp.success) {
-                    tutor_toast('Error!', get_response_message(resp), 'error');
+                    tutor_toast(__('Error!', 'tutor'), get_response_message(resp), 'error');
                     return;
                 }
 
                 const {new_value} = resp.data;
-
-                // Toggle class if togglable defined
                 if(button.data('state-class-0')) {
 
                     // Get toggle class
@@ -55,7 +58,6 @@ window.jQuery(document).ready($=>{
                     class_element[new_value==1 ? 'addClass' : 'removeClass']('active');
                 }
 
-                // Toggle text if togglable text defined
                 if(button.data('state-text-0')) {
 
                     // Get toggle text
@@ -75,40 +77,62 @@ window.jQuery(document).ready($=>{
                 }
             },
             complete:()=>{
-                $that.find('i').removeClass('tutor-loading-spinner');
+                $that.removeClass('is-loading');
             }
         });
     });
 
-    $(document).on('click', '#sideabr-qna-tab-content .tutor-qa-new a.sidebar-ask-new-qna-btn', function(e) {
+    $(document).on('click', '#sidebar-qna-tab-content .tutor-qa-new a.sidebar-ask-new-qna-btn', function(e) {
         $('.tutor-quesanswer-askquestion').addClass('tutor-quesanswer-askquestion-expand');
-        $('#sideabr-qna-tab-content').css({
+        $('#sidebar-qna-tab-content').css({
             'height' : 'calc(100% - 140px)'
         });
     })
 
-    $(document).on('click', '#sideabr-qna-tab-content .tutor-qa-new .sidebar-ask-new-qna-cancel-btn', function(e) {
+    $(document).on('click', '#sidebar-qna-tab-content .tutor-qa-new .sidebar-ask-new-qna-cancel-btn', function(e) {
         $('.tutor-quesanswer-askquestion').removeClass('tutor-quesanswer-askquestion-expand');
-        $('#sideabr-qna-tab-content').css({
+        $('#sidebar-qna-tab-content').css({
             'height' : 'calc(100% - 60px)'
         });
     })
 
     // Save/update question/reply
-    $(document).on('click', '.tutor-qa-reply button, .tutor-qa-new button.sidebar-ask-new-qna-submit-btn', function(){
+    $(document).on('click', '.tutor-qa-reply button.tutor-btn, .tutor-qa-new button.sidebar-ask-new-qna-submit-btn', function(e){
         let button      = $(this);
+        let currentEditor = '';
+        const closestWrapper = e.target.closest('.tutor-qna-reply-editor');
+        if (_tutorobject.tutor_pro_url && tinymce) {
+            // Current editor id
+            currentEditor = closestWrapper.querySelector('.tmce-active').getAttribute('id').split('-')[1];
+        }
         let form        = button.closest('[data-question_id]');
 
         let question_id = button.closest('[data-question_id]').data('question_id');
         let course_id   = button.closest('[data-course_id]').data('course_id');
         let context     = button.closest('[data-context]').data('context');
-        let answer      = form.find('textarea').val();
+        let answer      = '' !== currentEditor ? tinymce.get(currentEditor).getContent() : form.find('textarea').val();
+
         let back_url    = $(this).data('back_url');
 
         const btnInnerHtml = button.html().trim();
-        const { width : btnWidth, height : btnHeight } = button.get(0).getBoundingClientRect();
-        const btnStyles =  {width: `${btnWidth}px`, height: `${btnHeight}px`};
 
+        /**
+         * Warning alert
+         * 
+         * @since v2.1.0
+         */
+        if (_tutorobject.tutor_pro_url && currentEditor !== '') {
+            let tinyMCEContent = tinymce.get(currentEditor).getContent();
+            if (tinyMCEContent === '') {
+                tutor_toast(__('Warning!', 'tutor'), __('Empty Content not Allowed', 'tutor'), 'error');
+                return;
+            }
+        } else {
+            if (answer === '') {
+                tutor_toast(__('Warning!', 'tutor'), __('Empty Content not Allowed', 'tutor'), 'error');
+                return;
+            }
+        }
         $.ajax({
             url: _tutorobject.ajaxurl,
             type: 'POST',
@@ -121,13 +145,12 @@ window.jQuery(document).ready($=>{
                 action: 'tutor_qna_create_update'
             },
             beforeSend: () =>{
-                // button.addClass('tutor-updating-message');
-                button.css(btnStyles);
-                button.html(`<div class="tutor-loading-spinner" style="--size: 20px"></div>`);
+                button.addClass('is-loading');
             },
             success: resp => {
+                const {editor_id} = resp.data;
                 if(!resp.success) {
-                    tutor_toast('Error!', get_response_message(resp), 'error');
+                    tutor_toast(__('Error!', 'tutor'), get_response_message(resp), 'error');
                     return;
                 }
 
@@ -139,16 +162,48 @@ window.jQuery(document).ready($=>{
                     $('.tutor-qna-single-question').eq(0).before(resp.data.html);
                 }
                 //on successful reply make the textarea empty
-                if ($("#sideabr-qna-tab-content .tutor-quesanswer-askquestion textarea")) {
-                    $("#sideabr-qna-tab-content .tutor-quesanswer-askquestion textarea").val('');
+                if ($("#sidebar-qna-tab-content .tutor-quesanswer-askquestion textarea")) {
+                    $("#sidebar-qna-tab-content .tutor-quesanswer-askquestion textarea").val('');
                 }
-                if ($(".tutor-quesanswer-askquestion textarea")) {
-                    $(".tutor-quesanswer-askquestion textarea").val('');
+                
+                if (_tutorobject.tutor_pro_url && tinymce && undefined !== editor_id) {
+                    // Clear editor content.
+                    tinymce.get(currentEditor).setContent('');
+                    
+                    // Reinitialize new added question/reply editor.
+                    tinymce.execCommand('mceRemoveEditor', false, editor_id);
+                    tinymce.execCommand('mceAddEditor', false, editor_id);
+
+                    // Highlight code snippets
+                    $('.tutor-qna-single-question pre').each(function () {
+                        let el = $(this),
+                            fallback = 'javascript',
+                            lang = el.attr('class').trim().replace('language-', '') || fallback,
+                            highlighted = null;
+                
+                        if (Prism) {
+                            try {
+                                highlighted = Prism.highlight(el.text(), Prism.languages[lang], lang);
+                            } catch (error) {
+                                highlighted = Prism.highlight(el.text(), Prism.languages[fallback], fallback);
+                            }
+                
+                            highlighted ? el.html(highlighted) : null
+                        }
+                    });
+
+                } else {
+                    // Clear question & reply textarea.
+                    if ($(".tutor-quesanswer-askquestion textarea")) {
+                        $(".tutor-quesanswer-askquestion textarea").val('');
+                    }
+                    if (closestWrapper.find('textarea').length) {
+                        closestWrapper.find('textarea').val();
+                    }
                 }
             },
             complete: () =>{
-                button.html(btnInnerHtml)
-                // $('.tutor-qna-single-wrapper').find('.tutor-qa-reply').hide();
+                button.removeClass('is-loading');
             }
         })
     });

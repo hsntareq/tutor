@@ -1,3 +1,5 @@
+const { default: sprintf } = require("../../helper/sprintf");
+
 document.addEventListener("DOMContentLoaded", function(){
    const { __, _x, _n, _nx } = wp.i18n; 
    // Approve and Reject button
@@ -13,7 +15,9 @@ document.addEventListener("DOMContentLoaded", function(){
                 const amount = e.currentTarget.dataset.amount;
                 const accountName = e.currentTarget.dataset.name;
                 const content = document.getElementById('tutor-admin-withdraw-approve-content');
-                content.innerHTML = `${__( 'You are approving '+ `<strong style="color:#000;">${accountName}</strong>` + ' withdrawal request for '+ `<strong  style="color:#000;">${amount}</strong>` +'. Are you sure you want to approve?', 'tutor')}`;
+                content.innerHTML = `${
+                   sprintf( __( 'You are approving %s withdrawal request for %s. Are you sure you want to approve?', 'tutor'), `<strong style="color:#000;">${accountName}</strong>`, `<strong  style="color:#000;">${amount}</strong>` )
+                }`;
             }
        }
 
@@ -26,7 +30,9 @@ document.addEventListener("DOMContentLoaded", function(){
                 const amount = e.currentTarget.dataset.amount;
                 const accountName = e.currentTarget.dataset.name;
                 const content = document.getElementById('tutor-admin-withdraw-reject-content');
-                content.innerHTML = `${__( 'You are rejecting '+ `<strong   style="color:#000;">${accountName}</strong>` + ' withdrawal request for '+ `<strong   style="color:#000;">${amount}</strong>` +'. Are you sure you want to reject?', 'tutor')}`;
+                content.innerHTML = `${
+                   sprintf( __( 'You are rejecting  %s withdrawal request for %s. Are you sure you want to reject?', 'tutor' ), `<strong style="color:#000;">${accountName}</strong>`, `<strong style="color:#000;">${amount}</strong>` )
+                }`;
             }
         }
    }
@@ -75,9 +81,7 @@ document.addEventListener("DOMContentLoaded", function(){
         rejectType.onchange = (e) => {
             const type = e.target.value;
             if (type === 'Other') {
-                document.getElementById('tutor-withdraw-reject-other').innerHTML = `<div class="tutor-input-group tutor-form-control-lg tutor-mb-16">
-                <input type="text" name="reject-comment" class="tutor-form-control" placeholder="${__('Withdraw Reject Reason', 'tutor')}" required/>
-              </div>`;
+                document.getElementById('tutor-withdraw-reject-other').innerHTML = `<input type="text" name="reject-comment" class="tutor-form-control" placeholder="${__('Withdraw Reject Reason', 'tutor')}" required/>`;
             } 
         }
     }
@@ -92,27 +96,20 @@ document.addEventListener("DOMContentLoaded", function(){
         formData.set(window.tutor_get_nonce_data(true).key, window.tutor_get_nonce_data(true).value);
         try {
             // select loading button
-            const loadingButton = target.querySelector(".tutor-btn-loading");
-            // keep previous text
-            let prevHtml = loadingButton.innerHTML;
-            // add loading ball
-            loadingButton.innerHTML = `<div class="ball"></div>
-            <div class="ball"></div>
-            <div class="ball"></div>
-            <div class="ball"></div>`;
+            const submitButton = target.querySelector("[data-tutor-modal-submit]");
+            submitButton.classList.add('is-loading');
 
             const post = await fetch(window._tutorobject.ajaxurl, {
                 method: "POST",
                 body: formData,
             });
-            // after network request get previous html
-            loadingButton.innerHTML = prevHtml;
+
+            submitButton.classList.remove('is-loading');
             return post;
         } catch (error) {
             tutor_toast(__("Operation failed", "tutor"), error, "error")
         }
-    }   
-
+    }  
 
 
     /*

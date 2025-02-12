@@ -1,12 +1,14 @@
 const { get_response_message } = require("../../../helper/response");
 
 window.jQuery(document).ready($=>{
+    const { __ } = wp.i18n;
+    
     $('.tutor-settings-pass-field [name="confirm_new_password"]').on('input', function(){
         let original = $('[name="new_password"]');
         let val = (original.val() || '').trim();
         let matched = val && $(this).val()===val;
         
-        $(this).next()[matched ? 'show' : 'hide']();
+        $(this).parent().find('.tutor-validation-icon')[matched ? 'show' : 'hide']();
     });
 
     $('.tutor-profile-password-reset').click(function(e){
@@ -22,20 +24,20 @@ window.jQuery(document).ready($=>{
             type: 'POST',
             data,
             beforeSend:()=>{
-                btn.addClass('tutor-updating-message');
+                btn.addClass('is-loading');
             },
             success:resp=>{
                 let {success} = resp;
                 
                 if(success) {
-                    window.tutor_toast('Success', get_response_message(resp), 'success');
+                    window.tutor_toast(__('Success', 'tutor'), get_response_message(resp), 'success');
                     window.location.reload();
                 } else {
-                    window.tutor_toast('Error', get_response_message(resp), 'error');
+                    window.tutor_toast(__('Error', 'tutor'), get_response_message(resp), 'error');
                 }
             },
             complete:()=>{
-                btn.removeClass('tutor-updating-message');
+                btn.removeClass('is-loading');
             }
         })
     });

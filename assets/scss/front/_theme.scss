@@ -1,22 +1,32 @@
 body {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+
+	&.tutor-frontend {
+		*, *::before, *::after {
+			box-sizing: border-box;
+		}
+	}
+
+	.media-modal * {
+		box-sizing: content-box;
+	}
 }
 
 //common and reset css
 
 .tutor-wrap{
-	color: var(--tutor-text-color);
+	color: var(--tutor-body-color);
 	img{
 		max-width: 100%;
 		height: auto;
 	}
 }
+
 .tutor-custom-list-style{
 	list-style: none;
 	margin: 0;
 	padding: 0;
-	//font-size: 14px;
 	li{
 		position: relative;
 		margin-bottom: 5px;
@@ -27,10 +37,11 @@ body {
 			position: absolute;
 			left: 0;
 			font-family: 'tutor';
-			color: var(--tutor-primary-color);
+			color: var(--tutor-color-primary);
 		}
 	}
 }
+
 .tutor-entry-content{
 	> br {
 		display: none;

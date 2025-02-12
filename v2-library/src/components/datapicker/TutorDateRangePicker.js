@@ -1,8 +1,9 @@
+import { differenceInDays } from 'date-fns';
 import React, { useEffect, useState } from 'react';
-
 import DatePicker, { CalendarContainer } from 'react-datepicker';
-import { differenceInDays, differenceInHours } from 'date-fns';
-import { element } from 'prop-types';
+import { CustomInput } from '../CustomInput';
+const { __, _x, _n, _nx } = wp.i18n;
+
 
 const TutorDateRangePicker = () => {
 	const dateFormat = window._tutorobject ? window._tutorobject.wp_date_format : 'Y-M-d';
@@ -56,21 +57,15 @@ const TutorDateRangePicker = () => {
 					{children}
 					<div className="react-datepicker__custom-footer">
 						<div className="react-datepicker__selected-days-count">
-							{dayCount ? (dayCount > 1 ? `${dayCount} days selected` : `${dayCount} day selected`) : '0 day selected'}
+							{dayCount ? (dayCount > 1 ? `${dayCount} days selected` : `${dayCount} day selected`) : __( '0 day selected', 'tutor' )}
 						</div>
 						<div className="tutor-btns">
-							{/* <button
-								className="tutor-btn tutor-btn-disable-outline tutor-btn-ghost tutor-no-hover tutor-btn-md"
-								onClick={() => handleCalendarClose()}
-							>
-								Cancel
-							</button> */}
 							<button
 								type="button"
-								className="tutor-btn tutor-btn-tertiary tutor-is-outline tutor-btn-md"
+								className="tutor-btn tutor-btn-outline-primary"
 								onClick={applyDateRange}
 							>
-								Apply
+							{__('Apply', 'tutor')}
 							</button>
 						</div>
 					</div>
@@ -90,6 +85,7 @@ const TutorDateRangePicker = () => {
 	return (
 		<div className="tutor-react-datepicker tutor-react-datepicker__selects-range" style={{ width: '100%' }}>
 			<DatePicker
+				customInput={<CustomInput/>}
 				placeholderText={` ${dateFormat} -- ${dateFormat} `}
 				showPopperArrow={false}
 				shouldCloseOnSelect={false}
